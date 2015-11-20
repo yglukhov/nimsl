@@ -688,6 +688,7 @@ macro cpuTest(vertexShader, fragmentShader: typed, attributesAndUniforms: untype
 
 when isMainModule:
     import nimx.write_image_impl
+    import times
 
     proc myVertexShader(uModelViewProjectionMatrix: mat4, aPos: vec2, vPos: var vec2): vec4 =
         vPos = aPos
@@ -731,8 +732,11 @@ when isMainModule:
 
         var mvp = newIdentityMat4()
 
+        let startTime = epochTime()
         cpuTest(myVertexShader, myShader, {uModelViewProjectionMatrix : mvp, someP: newVec2(0), aPos: [vertices[0], vertices[1], vertices[2]]}, pseudoScreenBuffer, screenWidth)
         cpuTest(myVertexShader, myShader, {uModelViewProjectionMatrix : mvp, someP: newVec2(0), aPos: [vertices[0], vertices[2], vertices[3]]}, pseudoScreenBuffer, screenWidth)
+        let endTime = epochTime()
+        echo "Rasterization took: ", endTime - startTime, " seconds"
         discard stbi_write_png("output.png", screenWidth, screenHeight, colorComponents, addr pseudoScreenBuffer[0], 0)
 
     testShaderOnCPU()
