@@ -1,5 +1,7 @@
 # nimsl
-Shaders in Nim language
+Shaders in Nim language.
+
+Ever wanted to use metaprogramming and unittests for your shader functions? Now you have it! Of course you also have other nice Nim features, such as type inference, template, generics, etc.
 
 ```nim
 import nimsl
