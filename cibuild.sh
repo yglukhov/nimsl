@@ -20,7 +20,17 @@ installNimble()
     cd ~/nimble
     nim c -r src/nimble install
     cd -
-    PATH=$HOME/.nimble/bin:$PATH
+    export PATH=$HOME/.nimble/bin:$PATH
+}
+
+installLinuxDependencies()
+{
+
+}
+
+installMacOSDependencies()
+{
+
 }
 
 installDependencies()
@@ -35,25 +45,18 @@ buildTest()
 
 if [ "$(uname)" = "Linux" ]
 then
-    # Install deps on Linux
+    installLinuxDependencies
 else
     if [ "$(uname)" = "Darwin" ]
     then
-        # Install deps on MacOS
+        installMacOSDependencies
     fi
 fi
-#sudo -n apt-get update
-#sudo -n apt-get install -y libsdl2-dev
 
-
-echo Install Nim
 installNim
 
-echo Install Nimble
 installNimble
 
-echo Install dependencies
 installDependencies
 
-echo Build test
 buildTest
