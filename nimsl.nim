@@ -251,7 +251,7 @@ precision mediump float;
         globals &= getTypeName(ctx, param.typ, true)
         globals &= " "
         globals &= paramName
-        globals &= ";\L"
+        globals &= ";"
 
     if globals.len > 0:
         ctx.globalDefs.add(globals)
