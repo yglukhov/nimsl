@@ -25,12 +25,12 @@ installNimble()
 
 installLinuxDependencies()
 {
-
+    true
 }
 
 installMacOSDependencies()
 {
-
+    true
 }
 
 installDependencies()
