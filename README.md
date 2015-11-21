@@ -1,4 +1,4 @@
-# nimsl
+# nimsl [![Build Status](https://semaphoreci.com/api/v1/projects/a58e296c-b761-42d7-aedc-9fdbcf5280f4/611106/badge.svg)](https://semaphoreci.com/yglukhov/nimsl)
 Shaders in Nim language.
 
 Ever wanted to use metaprogramming and unittests for your shader functions? Now you have it! Of course you also have other nice Nim features, such as type inference, template, generics, etc.
