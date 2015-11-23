@@ -10,7 +10,7 @@ proc myVertexShader(uModelViewProjectionMatrix: mat4, aPos: vec2, vPos: var vec2
     vPos = aPos
     result = uModelViewProjectionMatrix * newVec4(aPos, 0, 1)
 
-proc myFragmentShader(vPos, someP: vec2): vec4 =
+proc myFragmentShader(vPos: vec2): vec4 =
     if vPos.x < 50:
         result = newVec4(1, 0, 0, 1) # red
     else:
