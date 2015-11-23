@@ -12,9 +12,9 @@ proc myVertexShader(uModelViewProjectionMatrix: mat4, aPos: vec2, vPos: var vec2
 
 proc myFragmentShader(vPos, someP: vec2): vec4 =
     if vPos.x < 50:
-        result = vec4(1, 0, 0, 1) # red
+        result = newVec4(1, 0, 0, 1) # red
     else:
-        result = vec4(0, 1, 0, 1) # green
+        result = newVec4(0, 1, 0, 1) # green
 
 const shaderCodeInGLSL = getGLSLVertexShader(myVertexShader)
 echo shaderCodeInGLSL
