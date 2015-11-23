@@ -21,6 +21,11 @@ proc newCtx*(): GLSLCompilerContext =
 
 proc gen(ctx: var GLSLCompilerContext, n: NimNode, r: var string)
 
+template genSemicolon(r: var string) =
+    let rl = r.len - 1
+    if rl > 0 and r[rl] != ';' and r[rl] != '}' and r[rl] != '{':
+            r &= ";"
+
 proc isRange(n: NimNode, rangeLen: int = -1): bool =
     if n.kind == nnkBracketExpr and $(n[0]) == "range":
         if rangeLen == -1:
@@ -81,8 +86,7 @@ proc genLetSection(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
 proc genStmtList(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
     for i in n:
         gen(ctx, i, r)
-        if r[^1] != ';' and r[^1] != '}' and r[^1] != '{':
-            r &= ";"
+        genSemicolon(r)
 
 proc isSystemSym(s: NimNode): bool =
     let ln = s.symbol.getImpl().lineinfo
@@ -283,6 +287,7 @@ proc genProcDef*(ctx: var GLSLCompilerContext, n: NimNode, main = false) =
         r &= retType
         r &= " result;"
     gen(ctx, n.body, r)
+    genSemicolon(r)
     if n.params[0].kind != nnkEmpty and not main:
         r &= "return result;"
     r &= "}"
@@ -335,7 +340,7 @@ proc genIfStmt(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
         else:
             echo "UNEXPECTED IF BRANCH: ", treeRepr(c)
             assert(false)
-        if r[^1] != ';': r &= ";"
+        genSemicolon(r)
         r &= "}"
 
 proc gen(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
