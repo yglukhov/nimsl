@@ -90,7 +90,7 @@ proc genStmtList(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
 
 proc isSystemSym(s: NimNode): bool =
     let ln = s.symbol.getImpl().lineinfo
-    if ln.find("lib/system.nim(") != -1:
+    if ln.find("lib/system.nim(") != -1 or ln.find("lib\\system.nim(") != -1:
         result = true
 
 proc genSystemCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
