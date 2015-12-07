@@ -104,6 +104,14 @@ proc genSystemCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
             gen(ctx, n[1], r)
             r &= "+="
             gen(ctx, n[2], r)
+    of "dec":
+        if n[2].kind == nnkIntLit and n[2].intVal == 1:
+            r &= "--"
+            gen(ctx, n[1], r)
+        else:
+            gen(ctx, n[1], r)
+            r &= "-="
+            gen(ctx, n[2], r)
     of "<=", ">=", "<", ">", "+", "-", "*", "/", "*=", "/=", "+=", "-=":
         if n.kind == nnkInfix:
             gen(ctx, n[1], r)
