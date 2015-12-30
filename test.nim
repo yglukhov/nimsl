@@ -35,7 +35,7 @@ proc myFragmentShader(vPos: vec2): vec4 =
 suite "codegen":
     test "vs":
         check(getGLSLVertexShader(myVertexShader) ==
-            "uniform mat4 mvp;attribute vec2 a;varying vec2 vPos;void main(){gl_Position=vec4(0.0);vPos=a;gl_Position=(mvp*vec4(a,0.0,1.0));}")
+            "uniform mat4 mvp;attribute vec2 a;varying vec2 vPos;void main(){vec4 result=vec4(0.0);vPos=a;result=(mvp*vec4(a,0.0,1.0));gl_Position=result;}")
 
 # import nimx.write_image_impl
 

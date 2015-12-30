@@ -214,16 +214,6 @@ proc genSym(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
                 ctx.definedSyms.add($(n.symbol))
                 gen(ctx, i, r)
             r &= $n
-    elif $(n) == "result":
-        if ctx.isMainProc:
-            if ctx.shaderKind == skVertexShader:
-                r &= "gl_Position"
-            elif ctx.shaderKind == skFragmentShader:
-                r &= "gl_FragColor"
-            else:
-                assert(false, "Not Implemented")
-        else:
-            r &= "result"
     else:
         r &= $n
 
@@ -289,7 +279,8 @@ proc genProcDef*(ctx: var GLSLCompilerContext, n: NimNode, main = false) =
                 r &= $(n.params[i][j])
     r &= "){"
     if main:
-        gen(ctx, genSym(nskVar, "result"), r)
+        r &= retType
+        r &= " result"
         r &= "=vec4(0.0);"
     elif n.params[0].kind != nnkEmpty:
         r &= retType
@@ -298,6 +289,12 @@ proc genProcDef*(ctx: var GLSLCompilerContext, n: NimNode, main = false) =
     genSemicolon(r)
     if n.params[0].kind != nnkEmpty and not main:
         r &= "return result;"
+    elif main:
+        case ctx.shaderKind
+        of skVertexShader:
+            r &= "gl_Position=result;"
+        of skFragmentShader:
+            r &= "gl_FragColor=result;"
     r &= "}"
     ctx.globalDefs.add(r)
     ctx.procNode = oldNode
