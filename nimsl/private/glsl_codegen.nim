@@ -14,10 +14,12 @@ type GLSLCompilerContext* = object
     globalDefs*: seq[string]
     definedSyms: seq[string]
     shaderKind*: ShaderKind
+    mainProcName*: string
 
 proc newCtx*(): GLSLCompilerContext =
     result.definedSyms = newSeq[string]()
     result.globalDefs = newSeq[string]()
+    result.mainProcName = "main"
 
 proc gen(ctx: var GLSLCompilerContext, n: NimNode, r: var string)
 
@@ -261,7 +263,7 @@ proc genProcDef*(ctx: var GLSLCompilerContext, n: NimNode, main = false) =
 
     var r = if main: "void" else: retType
     r &= " "
-    r &= (if main: "main" else: $(n[0]))
+    r &= (if main: ctx.mainProcName else: $(n[0]))
     r &= "("
 
     if main:

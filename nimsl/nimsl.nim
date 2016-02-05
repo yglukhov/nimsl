@@ -4,19 +4,20 @@ import nimsl.private.glsl_codegen
 {.pragma: glslbuiltin, tags: [glslbuiltin_t].}
 {.pragma: glslinfix, tags: [glslinfix_t].}
 
-proc getShaderCode(s: NimNode, k: ShaderKind): string =
+proc getShaderCode(s: NimNode, k: ShaderKind, mainProcName: string): string =
     var ctx = newCtx()
+    ctx.mainProcName = mainProcName
     ctx.shaderKind = k
     genProcDef(ctx, getImpl(s.symbol), true)
     result = ""
     for i in ctx.globalDefs:
         result &= i
 
-macro getGLSLFragmentShader*(s: typed): expr =
-    result = newLit(getShaderCode(s, skFragmentShader))
+macro getGLSLFragmentShader*(s: typed, mainProcName: string = "main"): string =
+    result = newLit(getShaderCode(s, skFragmentShader, mainProcName.strVal))
 
-macro getGLSLVertexShader*(s: typed): expr =
-    result = newLit(getShaderCode(s, skVertexShader))
+macro getGLSLVertexShader*(s: typed): string =
+    result = newLit(getShaderCode(s, skVertexShader, "main"))
 
 type
     vecBase[I: static[int], T] = distinct array[I, T]
