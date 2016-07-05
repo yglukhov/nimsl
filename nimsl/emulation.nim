@@ -1,6 +1,6 @@
 import macros, strutils
-import nimsl.nimsl
-import nimsl.private.glsl_codegen
+import nimsl
+import private.glsl_codegen
 
 proc pointInTriangle(p, p0, p1, p2: vec2): bool =
     var s = p0.y * p2.x - p0.x * p2.y + (p2.y - p0.y) * p.x + (p0.x - p2.x) * p.y

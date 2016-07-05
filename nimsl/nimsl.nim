@@ -1,5 +1,5 @@
 import macros, math, strutils
-import nimsl.private.glsl_codegen
+import private.glsl_codegen
 
 {.pragma: glslbuiltin, tags: [glslbuiltin_t].}
 {.pragma: glslinfix, tags: [glslinfix_t].}
