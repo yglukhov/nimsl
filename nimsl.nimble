@@ -1,5 +1,5 @@
 # Package
-version = "0.2.1"
+version = "0.2"
 author = "Yuriy Glukhov"
 description = "Shaders in Nim"
 license = "MIT"

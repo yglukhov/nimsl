@@ -236,7 +236,7 @@ precision mediump float;
 """
     for param in n.paramsAndTypes:
         let paramName = $(param.name)
-        if param.typ.kind == nnkVarTy:
+        if paramName.startsWith("v"):
             globals &= "varying "
         elif paramName.startsWith("a"):
             globals &= "attribute "
