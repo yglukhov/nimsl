@@ -1,7 +1,8 @@
 import macros, strutils
 
+proc glslbuiltin*() {.inline, asmNoStackFrame.} = discard
+
 type
-    glslbuiltin_t* = object
     glslinfix_t* = object
 
 type ShaderKind* = enum
@@ -44,10 +45,18 @@ proc hasTag(n: NimNode, tag: string): bool =
                     if $j == tag: return true
     of nnkSym:
         result = n.symbol.getImpl().hasTag(tag)
-    else:
-        result = false
+    else: discard
 
-proc isGLSLBuiltin(n: NimNode): bool = n.hasTag("glslbuiltin_t")
+proc isGLSLBuiltin(n: NimNode): bool =
+    case n.kind
+    of nnkProcDef:
+        let b = n.body
+        if b.kind == nnkStmtList:
+            let fs = b[0]
+            result = fs.kind == nnkCall and fs[0].kind == nnkSym and $fs[0] == "glslbuiltin"
+    of nnkSym:
+        result = isGLSLBuiltin(getImpl(n.symbol))
+    else: discard
 
 proc getTypeName(ctx: var GLSLCompilerContext, t: NimNode, skipVar = false): string =
     case t.kind
