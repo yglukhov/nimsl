@@ -1,6 +1,8 @@
 import macros, strutils
 
-proc glslbuiltin*() {.inline, asmNoStackFrame.} = discard
+{.push stackTrace: off.}
+proc glslbuiltin*() {.inline.} = discard
+{.pop.}
 
 type
     glslinfix_t* = object
