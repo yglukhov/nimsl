@@ -21,7 +21,7 @@ proc getValueByNameInTableConstr(tableConstr: NimNode, name: string): NimNode =
         if $(c[0]) == name:
             return c[1]
 
-macro cpuTest*(vertexShader, fragmentShader: typed, attributesAndUniforms: untyped, screenBuffer: var openarray[uint8], screenWidth: int): stmt =
+macro cpuTest*(vertexShader, fragmentShader: typed, attributesAndUniforms: untyped, screenBuffer: var openarray[uint8], screenWidth: int): untyped =
     var vsCalls = [newCall(vertexShader), newCall(vertexShader), newCall(vertexShader)]
     var fsCall = newCall(fragmentShader)
     var varyingDefs = newStmtList()
@@ -50,8 +50,9 @@ macro cpuTest*(vertexShader, fragmentShader: typed, attributesAndUniforms: untyp
             let vs0 = varSyms[0]
             let vs1 = varSyms[1]
             let vs2 = varSyms[2]
-            varyingInterpolations.add quote do:
+            let q = quote do:
                 let `varSym` = `vs0` * `a0` + `vs1` * `a1` + `vs2` * `a2`
+            varyingInterpolations.add q
         elif paramName.startsWith("a"):
             for i in 0 .. 2:
                 vsCalls[i].add(getValueByNameInTableConstr(attributesAndUniforms, paramName)[i])

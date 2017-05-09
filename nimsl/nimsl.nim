@@ -45,19 +45,19 @@ type
     bvec3* = vecBase[3, bool]
     bvec4* = vecBase[4, bool]
 
-template defineBorrowsForVec(i: int, t: typedesc): stmt =
+template defineBorrowsForVec(i: int, t: typedesc) =
     template `[]`*(v: vecBase[i, t], index: int): auto =
         array[i, t](v)[index]
     template `[]=`*(v: var vecBase[i, t], index: int, val: t) =
         array[i, t](v)[index] = val
 
-template defineBorrowsForMat(i: int, t: typedesc): stmt =
+template defineBorrowsForMat(i: int, t: typedesc) =
     template `[]`*(v: matBase[i, t], index: int): auto =
         array[i, t](v)[index]
     template `[]=`*(v: var matBase[i, t], index: int, val: t) =
         array[i, t](v)[index] = val
 
-template defineBorrowsForVecs(t: typedesc): stmt =
+template defineBorrowsForVecs(t: typedesc) =
     defineBorrowsForVec(2, t)
     defineBorrowsForVec(3, t)
     defineBorrowsForVec(4, t)
