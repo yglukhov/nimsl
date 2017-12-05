@@ -2,10 +2,9 @@ import macros, strutils
 
 {.push stackTrace: off.}
 proc glslbuiltin*() {.inline.} = discard
+proc glslinfix*() {.inline.} = discard
 {.pop.}
 
-type
-    glslinfix_t* = object
 
 type ShaderKind* = enum
     skVertexShader
@@ -38,27 +37,24 @@ proc isRange(n: NimNode, rangeLen: int = -1): bool =
         elif n[2].intVal - n[1].intVal + 1 == rangeLen:
             result = true
 
-proc hasTag(n: NimNode, tag: string): bool =
-    case n.kind
-    of nnkProcDef:
-        for i in n.pragma:
-            if i.kind == nnkPragma and i[0].kind == nnkExprColonExpr and $(i[0][0]) == "tags":
-                for j in i[0][1]:
-                    if $j == tag: return true
-    of nnkSym:
-        result = n.symbol.getImpl().hasTag(tag)
-    else: discard
+proc hasMagicMarker(n: NimNode, marker: string): bool =
+    template isMagicCallNode(n: NimNode): bool =
+        n.kind == nnkCall and n[0].kind == nnkSym and $n[0] == marker
 
-proc isGLSLBuiltin(n: NimNode): bool =
     case n.kind
     of nnkProcDef:
         let b = n.body
         if b.kind == nnkStmtList:
             let fs = b[0]
-            result = fs.kind == nnkCall and fs[0].kind == nnkSym and $fs[0] == "glslbuiltin"
+            result = fs.isMagicCallNode()
     of nnkSym:
-        result = isGLSLBuiltin(getImpl(n.symbol))
+        result = hasMagicMarker(getImpl(n.symbol), marker)
+    of nnkStmtListExpr:
+        let fs = n[0]
+        result = fs.isMagicCallNode()
     else: discard
+
+proc isGLSLBuiltin(n: NimNode): bool = n.hasMagicMarker("glslbuiltin")
 
 proc getTypeName(ctx: var GLSLCompilerContext, t: NimNode, skipVar = false): string =
     case t.kind
@@ -146,8 +142,8 @@ proc genSystemCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
         echo "UNKNOWN SYSTEM CALL: ", treeRepr(n)
 
 proc genCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
-    if n[0].hasTag("glslinfix_t"):
-        if $(n[0]) == ".":
+    if n[0].hasMagicMarker("glslinfix"):
+        if $n[0] in [".", "nimsl_deriveVectorWithComponents"]:
             # This is a property
             gen(ctx, n[1], r)
             r &= "."

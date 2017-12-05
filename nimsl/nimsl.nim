@@ -1,8 +1,6 @@
 import macros, math, strutils
 import private.glsl_codegen
 
-{.pragma: glslinfix, tags: [glslinfix_t].}
-
 proc getShaderCode(s: NimNode, k: ShaderKind, mainProcName: string): string =
     var ctx = newCtx()
     ctx.mainProcName = mainProcName
@@ -192,26 +190,44 @@ proc `*`*(m: mat4, v: vec4): vec4 =
     result[2] = m[2] * x + m[6] * y + m[10] * z + m[14] * w
     result[3] = m[3] * x + m[7] * y + m[11] * z + m[15] * w
 
-proc `.`*[T](v: vecBase[2, T], f: static[string]): vecBase[f.len, T] {.glslinfix.} =
+proc validateAttrs(s: string, a: set[char]) {.compileTime.} =
+    for c in s:
+        assert(c in a, "Invalid vector component: " & $c)
+
+proc nimsl_deriveVectorWithComponents[T](v: vecBase[2, T], f: static[string]): vecBase[f.len, T] =
+    glslinfix()
+    static: validateAttrs(f, {'x', 'r', 'y', 'g'})
     for i, c in f:
         case c
             of 'x', 'r': result[i] = v.x
             of 'y', 'g': result[i] = v.y
-            else: assert(false, "Unknown field: " & $c)
+            else: discard # Should be prevented by validateAttrs
 
-proc `.`*[T](v: vecBase[3, T], f: static[string]): vecBase[f.len, T] {.glslinfix.} =
+proc nimsl_deriveVectorWithComponents[T](v: vecBase[3, T], f: static[string]): vecBase[f.len, T] =
+    glslinfix()
+    static: validateAttrs(f, {'x', 'r', 'y', 'g', 'z', 'b'})
     for i, c in f:
         case c
             of 'x', 'r': result[i] = v.x
             of 'y', 'g': result[i] = v.y
             of 'z', 'b': result[i] = v.z
-            else: assert(false, "Unknown field: " & $c)
+            else: discard # Should be prevented by validateAttrs
 
-proc `.`*[T](v: vecBase[4, T], f: static[string]): vecBase[f.len, T] {.glslinfix.} =
+proc nimsl_deriveVectorWithComponents[T](v: vecBase[4, T], f: static[string]): vecBase[f.len, T] =
+    glslinfix()
+    static: validateAttrs(f, {'x', 'r', 'y', 'g', 'z', 'b', 'w', 'a'})
     for i, c in f:
         case c
             of 'x', 'r': result[i] = v.x
             of 'y', 'g': result[i] = v.y
             of 'z', 'b': result[i] = v.z
             of 'w', 'a': result[i] = v.w
-            else: assert(false, "Unknown field: " & $c)
+            else: discard # Should be prevented by validateAttrs
+
+when defined(nimNewDot):
+    template `.`*[I, T](v: vecBase[I, T], f: untyped): auto =
+        nimsl_deriveVectorWithComponents(v, astToStr(f))
+else:
+    proc `.`*[I, T](v: vecBase[I, T], f: static[string]): vecBase[f.len, T] {.inline.} =
+        glslinfix()
+        result = nimsl_deriveVectorWithComponents(v, f)

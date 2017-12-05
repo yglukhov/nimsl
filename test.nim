@@ -31,11 +31,19 @@ proc myFragmentShader(vPos: vec2): vec4 =
     result.drawShape(sdEllipseInRect(vPos, bounds), uStrokeColor);
     result.drawShape(sdEllipseInRect(vPos, insetRect(bounds, uStrokeWidth)), uFillColor);
 
+proc myVertexShader2(a: vec4): vec3 =
+    result = a.xxz
+
 
 suite "codegen":
     test "vs":
-        check(getGLSLVertexShader(myVertexShader) ==
-            "uniform mat4 mvp;attribute vec2 a;varying vec2 vPos;void main(){vec4 result=vec4(0.0);vPos=a;result=(mvp*vec4(a,0.0,1.0));gl_Position=result;}")
+        check getGLSLVertexShader(myVertexShader) ==
+            "uniform mat4 mvp;attribute vec2 a;varying vec2 vPos;void main(){vec4 result=vec4(0.0);vPos=a;result=(mvp*vec4(a,0.0,1.0));gl_Position=result;}"
+
+    test "vector accessors":
+        check getGLSLVertexShader(myVertexShader2) ==
+            "attribute vec4 a;void main(){vec3 result=vec4(0.0);result=a.xxz;gl_Position=result;}"
+
 
 # import nimx.write_image_impl
 
