@@ -1,29 +1,29 @@
 import nimsl.nimsl
 import nimsl.emulation
-import unittest, times
+import unittest, times, math
 
 proc fillAlpha(dist: float32): float32 =
     let d = fwidth(dist)
     result = 1.0 - smoothstep(-d, d, dist)
     #    return 1.0 - step(0.0, dist); // No antialiasing
 
-proc drawShape(res: var vec4, dist: float32, color: vec4) =
+proc drawShape(res: var Vec4, dist: float32, color: Vec4) =
     res = mix(res, color, fillAlpha(dist))
 
-proc sdEllipseInRect(pos: vec2, rect: vec4): float32 =
+proc sdEllipseInRect(pos: Vec2, rect: Vec4): float32 =
     let ab = rect.zw / 2.0
     let center = rect.xy + ab
     let p = pos - center
     result = dot(p * p, 1.0 / (ab * ab)) - 1.0
     result *= min(ab.x, ab.y)
 
-proc insetRect(r: vec4, by: float32): vec4 = newVec4(r.xy + by, r.zw - by * 2.0)
+proc insetRect(r: Vec4, by: float32): Vec4 = newVec4(r.xy + by, r.zw - by * 2.0)
 
-proc myVertexShader(mvp: mat4, a: vec2, vPos: var vec2): vec4 =
+proc myVertexShader(mvp: Mat4, a: Vec2, vPos: var Vec2): Vec4 =
     vPos = a
     result = mvp * newVec4(a, 0, 1)
 
-proc myFragmentShader(vPos: vec2): vec4 =
+proc myFragmentShader(vPos: Vec2): Vec4 =
     let bounds = newVec4(0, 0, 200, 100)
     let uStrokeColor = newVec4(0, 0, 0, 1)
     let uFillColor = newVec4(1, 0, 0, 1)
@@ -31,7 +31,7 @@ proc myFragmentShader(vPos: vec2): vec4 =
     result.drawShape(sdEllipseInRect(vPos, bounds), uStrokeColor);
     result.drawShape(sdEllipseInRect(vPos, insetRect(bounds, uStrokeWidth)), uFillColor);
 
-proc myVertexShader2(a: vec4): vec3 =
+proc myVertexShader2(a: Vec4): Vec3 =
     result = a.xxz
 
 
@@ -44,6 +44,17 @@ suite "codegen":
         check getGLSLVertexShader(myVertexShader2) ==
             "attribute vec4 a;void main(){vec3 result=vec4(0.0);result=a.xxz;gl_Position=result;}"
 
+suite "types":
+    test "vectors":
+        let v = newVec2(1, 2)
+        let x = v.yxxy
+        check x.x == 2
+        check x.y == 1
+        check x.z == 1
+        check x.w == 2
+
+        let s = sin(newVec3(PI, 0.0, PI))
+        check abs(s.x) < 0.001
 
 # import nimx.write_image_impl
 

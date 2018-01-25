@@ -59,18 +59,39 @@ proc isGLSLBuiltin(n: NimNode): bool = n.hasMagicMarker("glslbuiltin")
 proc getTypeName(ctx: var GLSLCompilerContext, t: NimNode, skipVar = false): string =
     case t.kind
     of nnkBracketExpr:
-        if $(t[0]) == "array" and t[1].isRange(2) and $(t[2]) == "float32":
+        let t0 = $t[0]
+        if t0 == "array" and t[1].isRange(2) and $t[2] == "float32":
             result = "vec2"
-        elif $(t[0]) == "array" and t[1].isRange(3) and $(t[2]) == "float32":
+        elif t0 == "array" and t[1].isRange(3) and $t[2] == "float32":
             result = "vec3"
-        elif $(t[0]) == "array" and t[1].isRange(4) and $(t[2]) == "float32":
+        elif t0 == "array" and t[1].isRange(4) and $t[2] == "float32":
             result = "vec4"
-        elif $(t[0]) == "distinct":
+        elif t0 == "distinct":
             result = getTypeName(ctx, t[1], skipVar)
+        else:
+            echo "Unknown type: ", treeRepr(t)
+            assert(false, "Unknown type")
     of nnkSym:
         case $t
-        of "vecBase": result = getTypeName(ctx, getType(t), skipVar)
+        of "VecBase": result = getTypeName(ctx, getType(t), skipVar)
         of "float32": result = "float"
+        of "Vec2", "vec2": result = "vec2"
+        of "Vec3", "vec3": result = "vec3"
+        of "Vec4", "vec4": result = "vec4"
+        of "Vec2i", "ivec2": result = "ivec2"
+        of "Vec3i", "ivec3": result = "ivec3"
+        of "Vec4i", "ivec4": result = "ivec4"
+        of "Vec2u", "uvec2": result = "uvec2"
+        of "Vec3u", "uvec3": result = "uvec3"
+        of "Vec4u", "uvec4": result = "uvec4"
+        of "Vec2d", "dvec2": result = "dvec2"
+        of "Vec3d", "dvec3": result = "dvec3"
+        of "Vec4d", "dvec4": result = "dvec4"
+        of "Vec2b", "bvec2": result = "bvec2"
+        of "Vec3b", "bvec3": result = "bvec3"
+        of "Vec4b", "bvec4": result = "bvec4"
+        of "Mat3", "mat3": result = "mat3"
+        of "Mat4", "mat4": result = "mat4"
         else:
             result = $t
     of nnkVarTy:
