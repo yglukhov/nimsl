@@ -6,11 +6,11 @@ Ever wanted to use metaprogramming and unittests for your shader functions? Now 
 ```nim
 import nimsl.nimsl
 
-proc myVertexShader(uModelViewProjectionMatrix: mat4, aPos: vec2, vPos: var vec2): vec4 =
+proc myVertexShader(uModelViewProjectionMatrix: Mat4, aPos: Vec2, vPos: var Vec2): vec4 =
     vPos = aPos
     result = uModelViewProjectionMatrix * newVec4(aPos, 0, 1)
 
-proc myFragmentShader(vPos: vec2): vec4 =
+proc myFragmentShader(vPos: Vec2): vec4 =
     if vPos.x < 50:
         result = newVec4(1, 0, 0, 1) # red
     else:
