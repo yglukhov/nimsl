@@ -2,15 +2,15 @@ import macros, strutils
 import nimsl
 import private.glsl_codegen
 
-proc pointInTriangle(p, p0, p1, p2: vec2): bool =
+proc pointInTriangle(p, p0, p1, p2: Vec2): bool =
     var s = p0.y * p2.x - p0.x * p2.y + (p2.y - p0.y) * p.x + (p0.x - p2.x) * p.y
     var t = p0.x * p1.y - p0.y * p1.x + (p0.y - p1.y) * p.x + (p1.x - p0.x) * p.y
 
-    if ((s < 0) != (t < 0)):
+    if (s < 0) != (t < 0):
         return false
 
     var A = -p1.y * p2.x + p0.y * (p2.x - p1.x) + p0.x * (p1.y - p2.y) + p1.x * p2.y
-    if (A < 0.0):
+    if A < 0.0:
         s = -s
         t = -t
         A = -A
@@ -18,7 +18,7 @@ proc pointInTriangle(p, p0, p1, p2: vec2): bool =
 
 proc getValueByNameInTableConstr(tableConstr: NimNode, name: string): NimNode =
     for c in tableConstr:
-        if $(c[0]) == name:
+        if $c[0] == name:
             return c[1]
 
 macro cpuTest*(vertexShader, fragmentShader: typed, attributesAndUniforms: untyped, screenBuffer: var openarray[uint8], screenWidth: int): untyped =
