@@ -1,5 +1,5 @@
 import macros, math, strutils
-import private.glsl_codegen
+import private/glsl_codegen
 
 proc getShaderCode(s: NimNode, k: ShaderKind, mainProcName: string): string =
     var ctx = newCtx()

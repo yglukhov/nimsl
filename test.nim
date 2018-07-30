@@ -1,5 +1,5 @@
-import nimsl.nimsl
-import nimsl.emulation
+import nimsl/nimsl
+import nimsl/emulation
 import unittest, times, math
 
 proc fillAlpha(dist: float32): float32 =
@@ -56,7 +56,7 @@ suite "types":
         let s = sin(newVec3(PI, 0.0, PI))
         check abs(s.x) < 0.001
 
-# import nimx.write_image_impl
+# import nimx/write_image_impl
 
 proc testShaderOnCPU() =
     const screenWidth = 500

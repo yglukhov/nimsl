@@ -4,7 +4,7 @@ Shaders in Nim language.
 Ever wanted to use metaprogramming and unittests for your shader functions? Now you have it! Of course you also have other nice Nim features, such as type inference, template, generics, etc. Since shader code is valid Nim code, you can compile it to native/js target and debug it with your regular debugging tools.
 
 ```nim
-import nimsl.nimsl
+import nimsl/nimsl
 
 proc myVertexShader(uModelViewProjectionMatrix: Mat4, aPos: Vec2, vPos: var Vec2): vec4 =
     vPos = aPos
@@ -29,7 +29,7 @@ void main(){gl_Position=vec4(0.0);vPos=aPos;gl_Position=(uModelViewProjectionMat
 
 Running shader on the CPU:
 ```nim
-import nimsl.emulation
+import nimsl/emulation
 
 const screenWidth = 500
 const screenHeight = 500
