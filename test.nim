@@ -38,7 +38,7 @@ proc myVertexShader2(a: Vec4): Vec3 =
 suite "codegen":
     test "vs":
         check getGLSLVertexShader(myVertexShader) ==
-            "uniform mat4 mvp;attribute vec2 a;varying vec2 vPos;void main(){vec4 result=vec4(0.0);vPos=a;result=(mvp*vec4(a,0.0,1.0));gl_Position=result;}"
+            "uniform mat4 mvp;attribute vec2 a;varying vec2 vPos;void main(){vec4 result=vec4(0.0);vPos=a;result=(mvp*vec4(a,0,1));gl_Position=result;}"
 
     test "vector accessors":
         check getGLSLVertexShader(myVertexShader2) ==
