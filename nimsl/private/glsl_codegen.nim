@@ -345,8 +345,13 @@ proc genWhileStmt(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
 proc genConv(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
     gen(ctx, n[1], r)
 
+proc skipConv(n: NimNode): NimNode =
+  result = n
+  while result.kind == nnkHiddenStdConv:
+    result = result[^1]
+
 proc genBracketExpr(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
-    let indexVal = n[1].intVal
+    let indexVal = n[1].skipConv.intVal
     gen(ctx, n[0], r)
     r &= "."
     case indexVal
