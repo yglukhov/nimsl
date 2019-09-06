@@ -200,9 +200,7 @@ defineUnaryVectorOp(cos)
 defineUnaryVectorOp(abs)
 
 # proc abs*(v: Vec2): Vec2 = glslbuiltin(); return [abs(v[0]), abs(v[1])].Vec2
-# proc max*(u, v: float32): float32 = glslbuiltin(); return (if u > v: u else: v)
 proc max*(v: Vec2, s: float32): Vec2 = glslbuiltin(); return [max(v[0], s), max(v[1], s)].Vec2
-proc min*(u, v: float32): float32 = glslbuiltin(); return (if u > v: v else: u)
 proc min*(v: Vec2, s: float32): Vec2 = glslbuiltin(); return [min(v[0], s), min(v[1], s)].Vec2
 proc length*(v: Vec2): float32 = glslbuiltin(); return sqrt(v[0] * v[0] + v[1] * v[1])
 
