@@ -10,7 +10,7 @@ requires "variant"
 # Tests
 const allTests = ["test", "nimsl/private/var_decls"]
 
-task tests, "Run tests":
+task test, "Run tests":
     exec "nimble jsTests"
     exec "nimble cTests"
 
