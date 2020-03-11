@@ -43,30 +43,6 @@ type
     Vec3b* = VecBase[3, bool]
     Vec4b* = VecBase[4, bool]
 
-
-    mat3* {.deprecated.} = Mat3
-    mat4* {.deprecated.} = Mat4
-
-    vec2* {.deprecated.} = Vec2
-    vec3* {.deprecated.} = Vec3
-    vec4* {.deprecated.} = Vec4
-
-    ivec2* {.deprecated.} = Vec2i
-    ivec3* {.deprecated.} = Vec3i
-    ivec4* {.deprecated.} = Vec4i
-
-    uvec2* {.deprecated.} = Vec2u
-    uvec3* {.deprecated.} = Vec3u
-    uvec4* {.deprecated.} = Vec4u
-
-    dvec2* {.deprecated.} = Vec2d
-    dvec3* {.deprecated.} = Vec3d
-    dvec4* {.deprecated.} = Vec4d
-
-    bvec2* {.deprecated.} = Vec2b
-    bvec3* {.deprecated.} = Vec3b
-    bvec4* {.deprecated.} = Vec4b
-
 template defineBorrowsForVec(i: int, t: typedesc) =
     template `[]`*(v: VecBase[i, t], index: int): auto =
         array[i, t](v)[index]
