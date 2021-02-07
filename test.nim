@@ -2,6 +2,8 @@ import nimsl/nimsl
 import nimsl/emulation
 import unittest, times, math
 
+{.experimental: "dotOperators".} # for swizzling
+
 proc fillAlpha(dist: float32): float32 =
     let d = fwidth(dist)
     result = 1.0 - smoothstep(-d, d, dist)
