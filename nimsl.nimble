@@ -5,7 +5,7 @@ description = "Shaders in Nim"
 license = "MIT"
 
 # Dependencies
-requires "variant"
+requires "variant#HEAD"
 
 # Tests
 const allTests = ["test", "nimsl/private/var_decls"]
