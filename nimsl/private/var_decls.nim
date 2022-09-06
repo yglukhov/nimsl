@@ -1,6 +1,13 @@
 import macros, tables, variant
 
-var varTab: TableRef[TypeID, RootRef]
+when defined(gcArc) or defined(gcOrc):
+    type
+        Any = pointer
+else:
+    type
+        Any = RootRef
+
+var varTab: TableRef[TypeID, Any]
 
 proc varNotFound(name: string) =
     discard
@@ -9,14 +16,16 @@ proc varNotFound(name: string) =
 proc getVarAddr[T](name: string): ptr T =
     if varTab.isNil:
         varNotFound(name)
-        varTab = newTable[TypeID, RootRef]()
+        varTab = newTable[TypeID, Any]()
     const tid = getTypeId(T)
     var t = varTab.getOrDefault(tid)
     var tt : TableRef[string, T]
     if t.isNil:
         varNotFound(name)
         tt = newTable[string, T]()
-        varTab[tid] = cast[RootRef](tt)
+        varTab[tid] = cast[Any](tt)
+        when defined(gcArc) or defined(gcOrc):
+            GC_ref(tt)
     else:
         tt = cast[TableRef[string, T]](t)
     if name notin tt:
@@ -27,13 +36,15 @@ proc getVarAddr[T](name: string): ptr T =
 
 proc setVar[T](name: string, v: T) =
     if varTab.isNil:
-        varTab = newTable[TypeID, RootRef]()
+        varTab = newTable[TypeID, Any]()
     const tid = getTypeId(T)
     var t = varTab.getOrDefault(tid)
     var tt : TableRef[string, T]
     if t.isNil:
         tt = newTable[string, T]()
-        varTab[tid] = cast[RootRef](tt)
+        varTab[tid] = cast[Any](tt)
+        when defined(gcArc) or defined(gcOrc):
+            GC_ref(tt)
     else:
         tt = cast[TableRef[string, T]](t)
     tt[name] = v
