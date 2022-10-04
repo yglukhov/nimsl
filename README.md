@@ -1,4 +1,4 @@
-# nimsl [![Build Status](https://travis-ci.org/yglukhov/nimsl.svg?branch=master)](https://travis-ci.org/yglukhov/nimsl) [![nimble](https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble_js.png)](https://github.com/yglukhov/nimble-tag)
+# nimsl [![Build Status](https://github.com/yglukhov/nimsl/workflows/CI/badge.svg?branch=master)](https://github.com/yglukhov/nimsl/actions?query=branch%3Amaster) [![nimble](https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble_js.png)](https://github.com/yglukhov/nimble-tag)
 Shaders in Nim language.
 
 Ever wanted to use metaprogramming and unittests for your shader functions? Now you have it! Of course you also have other nice Nim features, such as type inference, template, generics, etc. Since shader code is valid Nim code, you can compile it to native/js target and debug it with your regular debugging tools.
