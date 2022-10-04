@@ -1,19 +1,19 @@
-import macros, math, strutils
+import macros, math
 import private/glsl_codegen
 
 proc getShaderCode(s: NimNode, k: ShaderKind, mainProcName: string): string =
     var ctx = newCtx()
     ctx.mainProcName = mainProcName
     ctx.shaderKind = k
-    genProcDef(ctx, getImpl(s.symbol), true)
+    genProcDef(ctx, getImpl(s), true)
     result = ""
     for i in ctx.globalDefs:
         result &= i
 
-macro getGLSLFragmentShader*(s: typed, mainProcName: string = "main"): string =
+macro getGLSLFragmentShader*(s: typed{nkSym}, mainProcName: string = "main"): string =
     result = newLit(getShaderCode(s, skFragmentShader, mainProcName.strVal))
 
-macro getGLSLVertexShader*(s: typed): string =
+macro getGLSLVertexShader*(s: typed{nkSym}): string =
     result = newLit(getShaderCode(s, skVertexShader, "main"))
 
 type

@@ -1,42 +1,29 @@
-import macros, tables, variant
+import macros, tables
 
-var varTab: TableRef[TypeID, RootRef]
+type
+  VarValue[T] = ref object of RootRef
+    v: T
 
-proc varNotFound(name: string) =
-    discard
-    #raise newException(Exception, "Var " & name & " not set")
+var varTab: TableRef[string, RootRef]
 
 proc getVarAddr[T](name: string): ptr T =
     if varTab.isNil:
-        varNotFound(name)
-        varTab = newTable[TypeID, RootRef]()
-    const tid = getTypeId(T)
-    var t = varTab.getOrDefault(tid)
-    var tt : TableRef[string, T]
-    if t.isNil:
-        varNotFound(name)
-        tt = newTable[string, T]()
-        varTab[tid] = cast[RootRef](tt)
-    else:
-        tt = cast[TableRef[string, T]](t)
-    if name notin tt:
-        varNotFound(name)
-        var v: T
-        tt[name] = v
-    result = addr tt[name]
+        varTab = newTable[string, RootRef]()
+    var vv = VarValue[T](varTab.getOrDefault(name))
+    if vv.isNil:
+        vv = VarValue[T]()
+        varTab[name] = vv
+    addr vv.v
 
 proc setVar[T](name: string, v: T) =
     if varTab.isNil:
-        varTab = newTable[TypeID, RootRef]()
-    const tid = getTypeId(T)
-    var t = varTab.getOrDefault(tid)
-    var tt : TableRef[string, T]
-    if t.isNil:
-        tt = newTable[string, T]()
-        varTab[tid] = cast[RootRef](tt)
+        varTab = newTable[string, RootRef]()
+    var vv = VarValue[T](varTab.getOrDefault(name))
+    if vv.isNil:
+        vv = VarValue[T](v: v)
+        varTab[name] = vv
     else:
-        tt = cast[TableRef[string, T]](t)
-    tt[name] = v
+        vv.v = v
 
 proc nimslUniformAddr[T](name: string): ptr T {.inline.} = getVarAddr[T](name)
 proc nimslVaryingAddr[T](name: string): ptr T {.inline.} = getVarAddr[T](name)

@@ -1,11 +1,8 @@
 # Package
-version = "0.3.2"
+version = "0.3.3"
 author = "Yuriy Glukhov"
 description = "Shaders in Nim"
 license = "MIT"
-
-# Dependencies
-requires "variant"
 
 # Tests
 const allTests = ["test", "nimsl/private/var_decls"]

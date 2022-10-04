@@ -21,7 +21,7 @@ proc getValueByNameInTableConstr(tableConstr: NimNode, name: string): NimNode =
         if $c[0] == name:
             return c[1]
 
-macro cpuTest*(vertexShader, fragmentShader: typed, attributesAndUniforms: untyped, screenBuffer: var openarray[uint8], screenWidth: int): untyped =
+macro cpuTest*(vertexShader, fragmentShader: typed{nkSym}, attributesAndUniforms: untyped, screenBuffer: var openarray[uint8], screenWidth: int): untyped =
     var vsCalls = [newCall(vertexShader), newCall(vertexShader), newCall(vertexShader)]
     var fsCall = newCall(fragmentShader)
     var varyingDefs = newStmtList()
@@ -34,7 +34,7 @@ macro cpuTest*(vertexShader, fragmentShader: typed, attributesAndUniforms: untyp
 
     var globalVarSyms = newSeq[NimNode]()
 
-    for param in getImpl(vertexShader.symbol).paramsAndTypes:
+    for param in getImpl(vertexShader).paramsAndTypes:
         let paramName = $(param.name)
         if paramName.startsWith("v"):
             let varSym = genSym(nskLet, paramName)
@@ -61,7 +61,7 @@ macro cpuTest*(vertexShader, fragmentShader: typed, attributesAndUniforms: untyp
             for i in 0 .. 2:
                 vsCalls[i].add(getValueByNameInTableConstr(attributesAndUniforms, paramName))
 
-    for param in getImpl(fragmentShader.symbol).paramsAndTypes:
+    for param in getImpl(fragmentShader).paramsAndTypes:
         let paramName = $(param.name)
         if paramName.startsWith("v"):
             for vs in globalVarSyms:

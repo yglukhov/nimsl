@@ -48,7 +48,7 @@ proc hasMagicMarker(n: NimNode, marker: string): bool =
             let fs = b[0]
             result = fs.isMagicCallNode()
     of nnkSym:
-        result = hasMagicMarker(getImpl(n.symbol), marker)
+        result = hasMagicMarker(getImpl(n), marker)
     of nnkStmtListExpr:
         let fs = n[0]
         result = fs.isMagicCallNode()
@@ -119,8 +119,8 @@ proc genStmtList(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
         genSemicolon(r)
 
 proc isSystemSym(s: NimNode): bool =
-    let ln = s.symbol.getImpl().lineinfo
-    if ln.find("/system.nim(") != -1 or ln.find("\\system.nim(") != -1:
+    let ln = s.getImpl().lineinfo
+    if ln.find("/system.nim(") != -1 or ln.find("\\system.nim(") != -1 or ln.find("\\system\\") != -1 or ln.find("/system/") != -1:
         result = true
 
 proc genSystemCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
@@ -233,15 +233,15 @@ proc genGLSLBuiltinSym(n: NimNode): string =
     else: result = pn
 
 proc genSym(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
-    let i = getImpl(n.symbol)
+    let i = getImpl(n)
     case i.kind
     of nnkProcDef:
         if isGLSLBuiltin(i):
             r &= genGLSLBuiltinSym(n)
         else:
             #echo "SYMBOL: ", treeRepr(i)
-            if not ($(n.symbol) in ctx.definedSyms):
-                ctx.definedSyms.add($(n.symbol))
+            if $n notin ctx.definedSyms:
+                ctx.definedSyms.add($n)
                 gen(ctx, i, r)
             r &= $n
     else:
