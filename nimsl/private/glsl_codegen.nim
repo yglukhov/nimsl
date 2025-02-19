@@ -1,10 +1,5 @@
-import macros, strutils
-
-{.push stackTrace: off.}
-proc glslbuiltin*() {.inline.} = discard
-proc glslinfix*() {.inline.} = discard
-{.pop.}
-
+import std/[macros, strutils]
+import ./common
 
 type ShaderKind* = enum
     skVertexShader

@@ -1,20 +1,21 @@
-import macros, math
-import private/glsl_codegen
+import std/[macros, math]
+import private/common
+from private/glsl_codegen import nil
 
-proc getShaderCode(s: NimNode, k: ShaderKind, mainProcName: string): string =
-    var ctx = newCtx()
+proc getGLSLShaderCode(s: NimNode, k: glsl_codegen.ShaderKind, mainProcName: string): string =
+    var ctx = glsl_codegen.newCtx()
     ctx.mainProcName = mainProcName
     ctx.shaderKind = k
-    genProcDef(ctx, getImpl(s), true)
+    glsl_codegen.genProcDef(ctx, getImpl(s), true)
     result = ""
     for i in ctx.globalDefs:
         result &= i
 
 macro getGLSLFragmentShader*(s: typed{nkSym}, mainProcName: string = "main"): string =
-    result = newLit(getShaderCode(s, skFragmentShader, mainProcName.strVal))
+    result = newLit(getGLSLShaderCode(s, glsl_codegen.skFragmentShader, mainProcName.strVal))
 
 macro getGLSLVertexShader*(s: typed{nkSym}): string =
-    result = newLit(getShaderCode(s, skVertexShader, "main"))
+    result = newLit(getGLSLShaderCode(s, glsl_codegen.skVertexShader, "main"))
 
 type
     VecBase[I: static[int], T] = distinct array[I, T]
