@@ -5,7 +5,7 @@ description = "Shaders in Nim"
 license = "MIT"
 
 # Tests
-const allTests = ["test", "nimsl/private/var_decls"]
+const allTests = ["tests/test_all", "nimsl/private/var_decls"]
 
 task test, "Run tests":
   exec "nimble jsTests"

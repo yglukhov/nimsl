@@ -88,14 +88,14 @@ macro cpuTest*(vertexShader, fragmentShader: typed{nkSym}, attributesAndUniforms
     let p2 = `vsc1`
     let p3 = `vsc2`
 
-    let fp1 = newVec3(p1.xy, 0)
-    let fp2 = newVec3(p2.xy, 0)
-    let fp3 = newVec3(p3.xy, 0)
+    let fp1 = vec3(p1.xy)
+    let fp2 = vec3(p2.xy)
+    let fp3 = vec3(p3.xy)
 
     # Rasterization loop
     for x in 0 ..< screenWidth:
       for y in 0 ..< screenHeight:
-        let f = newVec3(x.float32, y.float32, 0)
+        let f = vec3(x.float32, y.float32)
         if pointInTriangle(f.xy, fp1.xy, fp2.xy, fp3.xy):
           let f1 = fp1-f
           let f2 = fp2-f

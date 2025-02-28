@@ -1,4 +1,4 @@
-# nimsl [![Build Status](https://github.com/yglukhov/nimsl/workflows/CI/badge.svg?branch=master)](https://github.com/yglukhov/nimsl/actions?query=branch%3Amaster) [![nimble](https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble_js.png)](https://github.com/yglukhov/nimble-tag)
+# nimsl [![CI](https://github.com/yglukhov/nimsl/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/yglukhov/nimsl/actions?query=branch%3Amaster) [![nimble](https://img.shields.io/badge/nimble-black?logo=nim&style=flat&labelColor=171921&color=%23f3d400)](https://nimble.directory/pkg/nimsl)
 Shaders in Nim language.
 
 Ever wanted to use metaprogramming and unittests for your shader functions? Now you have it! Of course you also have other nice Nim features, such as type inference, template, generics, etc. Since shader code is valid Nim code, you can compile it to native/js target and debug it with your regular debugging tools.
@@ -7,14 +7,14 @@ Ever wanted to use metaprogramming and unittests for your shader functions? Now 
 import nimsl/nimsl
 
 proc myVertexShader(uModelViewProjectionMatrix: Mat4, aPos: Vec2, vPos: var Vec2): Vec4 =
-    vPos = aPos
-    result = uModelViewProjectionMatrix * newVec4(aPos, 0, 1)
+  vPos = aPos
+  result = uModelViewProjectionMatrix * vec4(aPos, 0, 1)
 
 proc myFragmentShader(vPos: Vec2): Vec4 =
-    if vPos.x < 50:
-        result = newVec4(1, 0, 0, 1) # red
-    else:
-        result = newVec4(0, 1, 0, 1) # green
+  if vPos.x < 50:
+    result = vec4(1, 0, 0, 1) # red
+  else:
+    result = vec4(0, 1, 0, 1) # green
 
 const shaderCodeInGLSL = getGLSLVertexShader(myVertexShader)
 echo shaderCodeInGLSL
@@ -36,8 +36,8 @@ const screenHeight = 500
 const colorComponents = 4
 
 var pseudoScreenBuffer = newSeq[uint8](screenWidth * screenHeight * colorComponents)
-let vertices = [newVec2(0, 0), newVec2(screenWidth, 0),
-    newVec2(screenWidth, screenHeight), newVec2(0, screenHeight)]
+let vertices = [vec2(0, 0), vec2(screenWidth, 0),
+  vec2(screenWidth, screenHeight), vec2(0, screenHeight)]
 
 var mvp = newIdentityMat4()
 

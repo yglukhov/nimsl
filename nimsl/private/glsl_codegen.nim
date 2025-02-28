@@ -1,57 +1,47 @@
 import std/[macros, strutils]
-import ./common
+import ./[common, lower_exprs, codegen_common]
 
 type ShaderKind* = enum
   skVertexShader
   skFragmentShader
 
-type GLSLCompilerContext* = object
-  procNode: NimNode
-  isMainProc: bool
-  globalDefs*: seq[string]
-  definedSyms: seq[string]
-  shaderKind*: ShaderKind
-  mainProcName*: string
+const pretty = false
 
-proc newCtx*(): GLSLCompilerContext =
-  result.definedSyms = newSeq[string]()
-  result.globalDefs = newSeq[string]()
+type
+  CompilerContext = object
+    procNode: NimNode
+    isMainProc: bool
+    globalDefs*: seq[string]
+    definedSyms: seq[string]
+    shaderKind*: ShaderKind
+    mainProcName*: string
+    indent: int
+  GLSLCompilerContext* = CompilerContext
+
+proc indent(c: CompilerContext, r: var string) =
+  when pretty:
+    for i in 0 ..< c.indent:
+      r &= "  "
+
+proc nl(c: CompilerContext, r: var string) =
+  when pretty:
+    r &= "\n"
+
+proc space(c: CompilerContext, r: var string) =
+  when pretty:
+    r &= " "
+
+proc newCtx*(): CompilerContext =
   result.mainProcName = "main"
 
-proc gen(ctx: var GLSLCompilerContext, n: NimNode, r: var string)
+proc gen(ctx: var CompilerContext, n: NimNode, r: var string)
 
 template genSemicolon(r: var string) =
   let rl = r.len - 1
   if rl > 0 and r[rl] != ';' and r[rl] != '}' and r[rl] != '{':
       r &= ";"
 
-proc isRange(n: NimNode, rangeLen: int = -1): bool =
-  if n.kind == nnkBracketExpr and $(n[0]) == "range":
-    if rangeLen == -1:
-      result = true
-    elif n[2].intVal - n[1].intVal + 1 == rangeLen:
-      result = true
-
-proc hasMagicMarker(n: NimNode, marker: string): bool =
-  template isMagicCallNode(n: NimNode): bool =
-    n.kind == nnkCall and n[0].kind == nnkSym and $n[0] == marker
-
-  case n.kind
-  of nnkProcDef:
-    let b = n.body
-    if b.kind == nnkStmtList:
-      let fs = b[0]
-      result = fs.isMagicCallNode()
-  of nnkSym:
-    result = hasMagicMarker(getImpl(n), marker)
-  of nnkStmtListExpr:
-    let fs = n[0]
-    result = fs.isMagicCallNode()
-  else: discard
-
-proc isGLSLBuiltin(n: NimNode): bool = n.hasMagicMarker("glslbuiltin")
-
-proc getTypeName(ctx: var GLSLCompilerContext, t: NimNode, skipVar = false): string =
+proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string =
   case t.kind
   of nnkBracketExpr:
     let t0 = $t[0]
@@ -97,28 +87,39 @@ proc getTypeName(ctx: var GLSLCompilerContext, t: NimNode, skipVar = false): str
     echo "UNKNOWN TYPE: ", treeRepr(t)
     assert(false, "Unknown type")
 
-proc genLetSection(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
   for i in n:
     let s = i[0]
-    r &= getTypeName(ctx, getType(s))
+    if i[^2].kind != nnkEmpty:
+      r &= getTypeName(ctx, i[^2])
+    else:
+      r &= getTypeName(ctx, getType(s))
     r &= " "
     r &= $s
     if i[2].kind != nnkEmpty:
       r &= "="
       gen(ctx, i[2], r)
-    r &= ";"
 
-proc genStmtList(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
-  for i in n:
-    gen(ctx, i, r)
-    genSemicolon(r)
+proc genStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
+  case n.kind
+  of nnkStmtList:
+    # Nested stmtlists don't need extra indent and semicolon
+    gen(ctx, n, r)
+  else:
+    ctx.indent(r)
+    gen(ctx, n, r)
+    if r[^1] != '}':
+      r &= ";"
+    ctx.nl(r)
 
-proc isSystemSym(s: NimNode): bool =
-  let ln = s.getImpl().lineinfo
-  if ln.find("/system.nim(") != -1 or ln.find("\\system.nim(") != -1 or ln.find("\\system\\") != -1 or ln.find("/system/") != -1:
-    result = true
+proc genStmtList(ctx: var CompilerContext, n: NimNode, r: var string) =
+  if n.kind == nnkStmtList:
+    for i in n:
+      genStmt(ctx, i, r)
+  else:
+    genStmt(ctx, n, r)
 
-proc genSystemCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genSystemCall(ctx: var CompilerContext, n: NimNode, r: var string) =
   let pn = $(n[0])
   case pn
   of "inc":
@@ -157,30 +158,46 @@ proc genSystemCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
   else:
     echo "UNKNOWN SYSTEM CALL: ", treeRepr(n)
 
-proc genCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
-  if n[0].hasMagicMarker("glslinfix"):
-    if $n[0] in [".", "nimsl_deriveVectorWithComponents"]:
-      # This is a property
-      gen(ctx, n[1], r)
-      r &= "."
-      r &= $(n[2])
-    else:
-      gen(ctx, n[1], r)
-      r &= "."
-      r &= $(n[0])
+proc genCall(ctx: var CompilerContext, n: NimNode, r: var string) =
+  if n[0].isMagic() and $n[0] in [".", "nimsl_deriveVectorWithComponents"]:
+    # This is a property
+    gen(ctx, n[1], r)
+    r &= "."
+    r &= $(n[2])
   else:
-    if n[0].isSystemSym:
+    if n[0].kind == nnkSym and n[0].isSystemSym:
       genSystemCall(ctx, n, r)
+    elif isMagic(n[0]):
+      let name = $n[0]
+      if name in ["x", "y", "z", "w", "r", "g", "b", "a"]:
+        gen(ctx, n[1], r)
+        r &= "."
+        r &= $n[0]
+      # elif name == "fract":
+      #   r &= "modf("
+      #   gen(ctx, n[1], r)
+      #   r &= ").fract"
+      else:
+        gen(ctx, n[0], r)
+        r &= "("
+        for i in 1 ..< n.len:
+          if i != 1:
+            r &= ","
+            ctx.space(r)
+          gen(ctx, n[i], r)
+        r &= ")"
     else:
       gen(ctx, n[0], r)
       r &= "("
       for i in 1 ..< n.len:
-        if i != 1: r &= ","
+        if i != 1:
+          r &= ","
+          ctx.space(r)
         gen(ctx, n[i], r)
       r &= ")"
 
-proc genInfixCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
-  if isGLSLBuiltin(n[0]):
+proc genInfixCall(ctx: var CompilerContext, n: NimNode, r: var string) =
+  if isMagic(n[0]):
     r &= "("
     gen(ctx, n[1], r)
     r &= $(n[0])
@@ -189,26 +206,33 @@ proc genInfixCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
   else:
     genCall(ctx, n, r)
 
-proc genPrefixCall(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
-  if isGLSLBuiltin(n[0]):
+proc genPrefixCall(ctx: var CompilerContext, n: NimNode, r: var string) =
+  if isMagic(n[0]):
     r &= $(n[0])
     gen(ctx, n[1], r)
   else:
     genCall(ctx, n, r)
 
-proc genAsgn(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genAsgn(ctx: var CompilerContext, n: NimNode, r: var string) =
   gen(ctx, n[0], r)
   r &= "="
   gen(ctx, n[1], r)
 
-proc genReturnStmt(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genReturnStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   if ctx.isMainProc:
-    if n[0].kind == nnkEmpty:
+    if ctx.procNode.params[0].kind == nnkEmpty:
       r &= "return"
     else:
-      gen(ctx, genSym(nskVar, "result"), r)
+      if ctx.shaderKind == skVertexShader:
+        r &= "gl_Position"
+      else:
+        r &= "gl_FragColor"
       r &= "="
-      gen(ctx, n[0][1], r)
+      if n[0].kind == nnkEmpty:
+        r &= "result"
+      else:
+        n[0].expectKind(nnkAsgn)
+        gen(ctx, n[0][1], r)
       r &= ";return"
   else:
     r &= "return"
@@ -227,11 +251,11 @@ proc genGLSLBuiltinSym(n: NimNode): string =
   of "newVec4": result = "vec4"
   else: result = pn
 
-proc genSym(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
   let i = getImpl(n)
   case i.kind
   of nnkProcDef:
-    if isGLSLBuiltin(i):
+    if isMagic(i):
       r &= genGLSLBuiltinSym(n)
     else:
       #echo "SYMBOL: ", treeRepr(i)
@@ -247,7 +271,7 @@ iterator paramsAndTypes*(procNode: NimNode): tuple[name, typ: NimNode] =
     for j in 0 .. procNode.params[i].len - 3:
       yield(procNode.params[i][j], procNode.params[i][^2])
 
-proc genGlobals(ctx: var GLSLCompilerContext, n: NimNode) =
+proc genGlobals(ctx: var CompilerContext, n: NimNode) =
   # n is the main proc def. collect uniforms, varyings and attributes
   var globals = ""
   if ctx.shaderKind == skFragmentShader:
@@ -274,7 +298,7 @@ precision mediump float;
   if globals.len > 0:
     ctx.globalDefs.add(globals)
 
-proc genProcDef*(ctx: var GLSLCompilerContext, n: NimNode, main = false) =
+proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
   let oldNode = ctx.procNode
   let oldMain = ctx.isMainProc
   ctx.procNode = n
@@ -310,8 +334,10 @@ proc genProcDef*(ctx: var GLSLCompilerContext, n: NimNode, main = false) =
   elif n.params[0].kind != nnkEmpty:
     r &= retType
     r &= " result;"
-  gen(ctx, n.body, r)
-  genSemicolon(r)
+  
+  let body = lowerExprs(n.body)
+  genStmtList(ctx, body, r)
+  # genSemicolon(r)
   if n.params[0].kind != nnkEmpty and not main:
     r &= "return result;"
   elif main:
@@ -325,19 +351,19 @@ proc genProcDef*(ctx: var GLSLCompilerContext, n: NimNode, main = false) =
   ctx.procNode = oldNode
   ctx.isMainProc = oldMain
 
-proc genBlockStmt(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genBlockStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "{"
   gen(ctx, n[1], r)
   r &= "}"
 
-proc genWhileStmt(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genWhileStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "while("
   gen(ctx, n[0], r)
   r &= "){"
   gen(ctx, n[1], r)
   r &= "}"
 
-proc genConv(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genConv(ctx: var CompilerContext, n: NimNode, r: var string) =
   gen(ctx, n[1], r)
 
 proc skipConv(n: NimNode): NimNode =
@@ -345,7 +371,7 @@ proc skipConv(n: NimNode): NimNode =
   while result.kind == nnkHiddenStdConv:
     result = result[^1]
 
-proc genBracketExpr(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genBracketExpr(ctx: var CompilerContext, n: NimNode, r: var string) =
   let indexVal = n[1].skipConv.intVal
   gen(ctx, n[0], r)
   r &= "."
@@ -356,7 +382,7 @@ proc genBracketExpr(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
   of 3: r &= "w"
   else: assert(false)
 
-proc genIfStmt(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc genIfStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   var first = true
   for c in n:
     if c.kind == nnkElifBranch:
@@ -378,7 +404,7 @@ proc genIfStmt(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
     genSemicolon(r)
     r &= "}"
 
-proc gen(ctx: var GLSLCompilerContext, n: NimNode, r: var string) =
+proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
   case n.kind:
   of nnkLetSection, nnkVarSection: genLetSection(ctx, n, r)
   of nnkStmtList: genStmtList(ctx, n, r)
