@@ -63,4 +63,13 @@ block:
 attribute vec4 a;void main(){vec3 result=vec4(0.0);result=a.xxz;gl_Position=result;}
 """)
 
+block:
+  proc s() =
+    var a = vec3(1)
+    a.x = 4
+
+  chk(getGLSLVertexShader(s), """
+void main(){vec3 a=vec3(1);a.x=4;}
+""")
+
 echo "GLSL Codegen: OK"

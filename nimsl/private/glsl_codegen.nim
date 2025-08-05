@@ -36,11 +36,6 @@ proc newCtx*(): CompilerContext =
 
 proc gen(ctx: var CompilerContext, n: NimNode, r: var string)
 
-template genSemicolon(r: var string) =
-  let rl = r.len - 1
-  if rl > 0 and r[rl] != ';' and r[rl] != '}' and r[rl] != '{':
-      r &= ";"
-
 proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string =
   case t.kind
   of nnkBracketExpr:
@@ -308,6 +303,8 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
   if n.params[0].kind != nnkEmpty:
     retType = getTypeName(ctx, n.params[0])
 
+  let hasResult = n.params[0].kind != nnkEmpty
+
   var r = if main: "void" else: retType
   r &= " "
   r &= (if main: ctx.mainProcName else: $(n[0]))
@@ -327,25 +324,27 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
         r &= " "
         r &= $(n.params[i][j])
   r &= "){"
-  if main:
-    r &= retType
-    r &= " result"
-    r &= "=vec4(0.0);"
-  elif n.params[0].kind != nnkEmpty:
-    r &= retType
-    r &= " result;"
+  if hasResult:
+    if main:
+      r &= retType
+      r &= " result"
+      r &= "=vec4(0.0);"
+    else:
+      r &= retType
+      r &= " result;"
   
   let body = lowerExprs(n.body)
   genStmtList(ctx, body, r)
-  # genSemicolon(r)
-  if n.params[0].kind != nnkEmpty and not main:
-    r &= "return result;"
-  elif main:
-    case ctx.shaderKind
-    of skVertexShader:
-      r &= "gl_Position=result;"
-    of skFragmentShader:
-      r &= "gl_FragColor=result;"
+
+  if hasResult:
+    if main:
+      case ctx.shaderKind
+      of skVertexShader:
+        r &= "gl_Position=result;"
+      of skFragmentShader:
+        r &= "gl_FragColor=result;"
+    else:
+      r &= "return result;"
   r &= "}"
   ctx.globalDefs.add(r)
   ctx.procNode = oldNode
@@ -394,14 +393,13 @@ proc genIfStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
       r &= "("
       gen(ctx, c[0], r)
       r &= "){"
-      gen(ctx, c[1], r)
+      genStmtList(ctx, c[1], r)
     elif c.kind == nnkElse:
       r &= "else{"
-      gen(ctx, c[0], r)
+      genStmtList(ctx, c[0], r)
     else:
       echo "UNEXPECTED IF BRANCH: ", treeRepr(c)
       assert(false)
-    genSemicolon(r)
     r &= "}"
 
 proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
