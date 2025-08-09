@@ -40,7 +40,6 @@ struct VertexInput {
 
 
 fn setVelocity0(x: u32, y: u32, v: vec2f) {
-  ;
 }
 
 @vertex
@@ -97,7 +96,6 @@ block: # enums
 
   chk(wgslShader(vsMain), """
 fn someFunc0(e: i32) {
-  ;
 }
 
 @vertex
@@ -174,6 +172,8 @@ block: # ops
     let
       e = 5'f32
       f = e mod 2'f32
+    var v = vec4(1)
+    v.y = v.y * 2
 
   chk(wgslShader(vsMain), """
 @vertex
@@ -184,6 +184,8 @@ fn vsMain() {
   let d = !(c);
   let e = 5.0;
   let f = e % 2.0;
+  var v = vec4f(f32(1));
+  v.y = (v.y * f32(2));
 }
 """)
 

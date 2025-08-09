@@ -118,11 +118,15 @@ template defineConstructors(suffix: untyped, elemType: untyped) =
   proc `vec4 suffix`*(xy: `Vec2 suffix`): `Vec4 suffix` {.nimslmagic, inline.} = [xy[0], xy[1], default(elemType), default(elemType)].`Vec4 suffix`
   proc `vec4 suffix`*(xy: `Vec2 suffix`, z: elemType): `Vec4 suffix` {.nimslmagic, inline.} = [xy[0], xy[1], z, default(elemType)].`Vec4 suffix`
   proc `vec4 suffix`*(xy: `Vec2 suffix`, z, w: elemType): `Vec4 suffix` {.nimslmagic, inline.} = [xy[0], xy[1], z, w].`Vec4 suffix`
-
+  proc `vec4 suffix`*(x: elemType, yz: `Vec2 suffix`): `Vec4 suffix` {.nimslmagic, inline.} = [x, yz[0], yz[1], default(elemType)].`Vec4 suffix`
+  proc `vec4 suffix`*(x: elemType, yz: `Vec2 suffix`, w: elemType): `Vec4 suffix` {.nimslmagic, inline.} = [x, yz[0], yz[1], w].`Vec4 suffix`
+  proc `vec4 suffix`*(x, y: elemType, zw: `Vec2 suffix`): `Vec4 suffix` {.nimslmagic, inline.} = [x, y, zw[0], zw[1]].`Vec4 suffix`
   proc `vec4 suffix`*(xy, zw: `Vec2 suffix`): `Vec4 suffix` {.nimslmagic, inline.} = [xy[0], xy[1], zw[0], zw[1]].`Vec4 suffix`
+
   proc `vec4 suffix`*(xyz: `Vec3 suffix`): `Vec4 suffix` {.nimslmagic, inline.} = [xyz[0], xyz[1], xyz[2], default(elemType)].`Vec4 suffix`
   proc `vec4 suffix`*(xyz: `Vec3 suffix`, w: elemType): `Vec4 suffix` {.nimslmagic, inline.} = [xyz[0], xyz[1], xyz[2], w].`Vec4 suffix`
-  
+  proc `vec4 suffix`*(x: elemType, yzw: `Vec3 suffix`): `Vec4 suffix` {.nimslmagic, inline.} = [x, yzw[0], yzw[1], yzw[2]].`Vec4 suffix`
+
 
 defineConstructors(u, uint32)
 defineConstructors(i, int32)
@@ -154,10 +158,14 @@ proc vec4*(x, y, z, w: float32): Vec4 {.nimslmagic, inline.} = [x, y, z, w].Vec4
 proc vec4*(xy: Vec2): Vec4 {.nimslmagic, inline.} = [xy[0], xy[1], default(float32), default(float32)].Vec4
 proc vec4*(xy: Vec2, z: float32): Vec4 {.nimslmagic, inline.} = [xy[0], xy[1], z, default(float32)].Vec4
 proc vec4*(xy: Vec2, z, w: float32): Vec4 {.nimslmagic, inline.} = [xy[0], xy[1], z, w].Vec4
-
+proc vec4*(x: float32, yz: Vec2): Vec4 {.nimslmagic, inline.} = [x, yz[0], yz[1], default(float32)].Vec4
+proc vec4*(x: float32, yz: Vec2, w: float32): Vec4 {.nimslmagic, inline.} = [x, yz[0], yz[1], w].Vec4
+proc vec4*(x, y: float32, zw: Vec2): Vec4 {.nimslmagic, inline.} = [x, y, zw[0], zw[1]].Vec4
 proc vec4*(xy, zw: Vec2): Vec4 {.nimslmagic, inline.} = [xy[0], xy[1], zw[0], zw[1]].Vec4
+
 proc vec4*(xyz: Vec3): Vec4 {.nimslmagic, inline.} = [xyz[0], xyz[1], xyz[2], default(float32)].Vec4
 proc vec4*(xyz: Vec3, w: float32): Vec4 {.nimslmagic, inline.} = [xyz[0], xyz[1], xyz[2], w].Vec4
+proc vec4*(x: float32, yzw: Vec3): Vec4 {.nimslmagic, inline.} = [x, yzw[0], yzw[1], yzw[2]].Vec4
 
 
 proc newVec2*(x, y: float32): Vec2 {.nimslmagic.} = [x, y].Vec2
@@ -276,9 +284,10 @@ proc smoothstep*(edge0, edge1, x: float32): float32 {.nimslmagic.} =
   result = c*c*(3 - 2*c)
 
 proc fwidth*(v: float32): float32 {.nimslmagic.} = 0
-proc mix*(x, y, a: Vec4): Vec4 {.nimslmagic.} =
-  assert(false, "Not implemented")
-proc mix*[N: static[int]](x, y: VecBase[N, float32], a: float32): VecBase[N, float32] {.nimslmagic.} = x * (1.0 - a) + y * (a)
+proc mix*[I: static[int]](x, y: VecBase[I, float32], a: float32): VecBase[I, float32] {.nimslmagic.} = x * (1.0 - a) + y * a
+proc mix*[I: static[int]](x, y, a: VecBase[I, float32]): VecBase[I, float32] {.nimslmagic.} =
+  for i in 0 ..< I:
+    result[i] = x[i] * (1.0 - a[i]) + y[i] * a[i]
 
 proc dot*[I: static[int], T](v1, v2: VecBase[I, T]): T {.nimslmagic.} =
   for i in 0 ..< I: result += v1[i] * v2[i]
@@ -319,11 +328,6 @@ proc x*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: of
 proc y*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[1]
 proc z*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[2]
 proc w*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[3]
-
-template `x=`*[I: static[int], T](v: var VecBase[I, T], val: T) = v[0] = val
-template `y=`*[I: static[int], T](v: var VecBase[I, T], val: T) = v[1] = val
-template `z=`*[I: static[int], T](v: var VecBase[I, T], val: T) = v[2] = val
-template `w=`*[I: static[int], T](v: var VecBase[I, T], val: T) = v[3] = val
 
 proc `*`*(m: Mat4, v: Vec4): Vec4 {.nimslmagic.} =
   let (x, y, z, w) = (v[0], v[1], v[2], v[3])

@@ -3,34 +3,15 @@ import ./[common, lower_exprs, codegen_common]
 
 proc hash(n: NimNode): Hash = hash($n)
 
-const pretty = true
-
-type CompilerContext* = object
-  procNode: NimNode
+type CompilerContext* = object of CompilerContextBase
   globalIdCounter: int
-  globalDefs*: seq[string]
   localSyms: Table[NimNode, string]
   globalSyms: Table[NimNode, string]
-  indent: int
-
-proc indent(c: CompilerContext, r: var string) =
-  when pretty:
-    for i in 0 ..< c.indent:
-      r &= "  "
-
-proc nl(c: CompilerContext, r: var string) =
-  when pretty:
-    r &= "\n"
-
-proc space(c: CompilerContext, r: var string) =
-  when pretty:
-    r &= " "
 
 proc mangleSym(n: NimNode): string =
   n.expectKind({nnkIdent, nnkSym})
   result = $n
   result = result.replace('`', '_')
-
 
 proc gen(ctx: var CompilerContext, n: NimNode, r: var string)
 proc genStmtList(ctx: var CompilerContext, n: NimNode, r: var string)
@@ -127,8 +108,7 @@ proc genPragmas(ctx: var CompilerContext, pragmas: NimNode, r: var string) =
 proc genType(c: var CompilerContext, n: NimNode) =
   let i = getImpl(n)
   i.expectKind(nnkTypeDef)
-  let oldIndent = c.indent
-  c.indent = 0
+  resetPropertyInScope(c.indent)
 
   let o = i[2]
   case o.kind
@@ -176,7 +156,6 @@ proc genType(c: var CompilerContext, n: NimNode) =
   else:
     echo "Unexpected type kind: ", o.kind
     doAssert(false)
-  c.indent = oldIndent
 
 proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string =
   case t.kind
@@ -275,7 +254,7 @@ proc genStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   of nnkStmtList:
     # Nested stmtlists don't need extra indent and semicolon
     gen(ctx, n, r)
-  else:
+  elif n.kind != nnkDiscardStmt or n[0].kind != nnkEmpty:
     ctx.indent(r)
     gen(ctx, n, r)
     if r[^1] != '}':
@@ -411,6 +390,11 @@ proc genSystemCall(ctx: var CompilerContext, n: NimNode, r: var string) =
   else:
     echo "UNKNOWN SYSTEM CALL: ", treeRepr(n)
 
+proc skipAddr(n: NimNode): NimNode =
+  result = n
+  while result.kind in {nnkHiddenAddr}:
+    result = result[^1]
+
 proc genCall(ctx: var CompilerContext, n: NimNode, r: var string) =
   if n[0].isMagic() and $n[0] in [".", "nimsl_deriveVectorWithComponents"]:
     # This is a property
@@ -423,9 +407,9 @@ proc genCall(ctx: var CompilerContext, n: NimNode, r: var string) =
     elif isMagic(n[0]):
       let name = $n[0]
       if name in ["x", "y", "z", "w", "r", "g", "b", "a"]:
-        gen(ctx, n[1], r)
+        gen(ctx, skipAddr(n[1]), r)
         r &= "."
-        r &= $n[0]
+        r &= name
       # elif name == "fract":
       #   r &= "modf("
       #   gen(ctx, n[1], r)
@@ -540,9 +524,11 @@ proc genGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
   let varAttrs = globalVarAttrs(pragmas, hasAssignment = val.kind != nnkEmpty)
   if varAttrs.len != 0:
     r &= "<"
-    r &= varAttrs.join(when pretty: ", " else: ",")
+    r &= varAttrs.join(if ctx.pretty: ", " else: ",")
     r &= ">"
-  ctx.space(r)
+    ctx.space(r)
+  else:
+    r &= " "
   r &= namestr
   r &= ":"
   ctx.space(r)
@@ -608,13 +594,9 @@ type
 
 proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] = {}) =
   # echo "PROCDEF: ", treeRepr n
-  let oldNode = ctx.procNode
-  # let oldMain = ctx.isMainProc
-  let oldIndent = ctx.indent
-  var oldLocalSyms: Table[NimNode, string]
-  swap(oldLocalSyms, ctx.localSyms)
-  ctx.procNode = n
-  ctx.indent = 0
+  resetPropertyInScope(ctx.procNode, n)
+  resetPropertyInScope(ctx.indent)
+  resetPropertyInScope(ctx.localSyms)
 
   var retType = "void"
   if n.params[0].kind != nnkEmpty:
@@ -685,10 +667,6 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] =
   ctx.nl(r)
   ctx.nl(r)
   ctx.globalDefs.add(r)
-  ctx.procNode = oldNode
-  # ctx.isMainProc = oldMain
-  ctx.indent = oldIndent
-  swap(oldLocalSyms, ctx.localSyms)
 
 proc genBlockStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "{"
@@ -907,9 +885,12 @@ proc genIntLit(ctx: var CompilerContext, n: NimNode, r: var string) =
     r &= "u"
 
 proc genHiddenDeref(ctx: var CompilerContext, n: NimNode, r: var string) =
-  r &= "(*"
-  gen(ctx, n[0], r)
-  r &= ")"
+  if n[^1].kind in {nnkIdent, nnkSym}:
+    r &= "(*"
+    gen(ctx, n[0], r)
+    r &= ")"
+  else:
+    gen(ctx, n[0], r)
 
 proc genHiddenAddr(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "(&"
@@ -947,7 +928,7 @@ proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
   of nnkDiscardStmt: gen(ctx, n[0], r)
   of nnkEmpty: discard
   of nnkCommentStmt:
-    when pretty:
+    if ctx.pretty:
       r &= "// " & $n
   else:
     echo "UNKNOWN NODE:"
@@ -955,6 +936,7 @@ proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
 
 proc genShader(syms: NimNode): string =
   var c: CompilerContext
+  c.pretty = true
   for s in syms:
     genProcDef(c, getImpl(s))
     # echo repr getImpl(s)
@@ -969,7 +951,7 @@ macro wgslShader*(syms: varargs[typed]): untyped =
   newLit(genShader(syms))
 
 when wgslOutputPath != "":
-  var c {.compileTime.}: CompilerContext
+  var c {.compileTime.} = CompilerContext(pretty: not defined(release))
 
   proc flushDefs(since: int) =
     writeFile(wgslOutputPath, c.globalDefs.join())

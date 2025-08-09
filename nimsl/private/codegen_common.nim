@@ -1,4 +1,23 @@
-import std/[macros, strutils]
+import std/[macros, strutils, sequtils]
+
+type CompilerContextBase* = object of RootObj
+  procNode*: NimNode
+  globalDefs*: seq[string]
+  indent*: int
+  pretty*: bool
+
+proc indent*(c: CompilerContextBase, r: var string) =
+  if c.pretty:
+    for i in 0 ..< c.indent:
+      r &= "  "
+
+proc nl*(c: CompilerContextBase, r: var string) =
+  if c.pretty:
+    r &= "\n"
+
+proc space*(c: CompilerContextBase, r: var string) =
+  if c.pretty:
+    r &= " "
 
 proc isIdent*(n: NimNode, s: string): bool =
   n.kind in {nnkIdent, nnkSym} and cmpIgnoreStyle($n, s) == 0
@@ -34,3 +53,51 @@ proc isSystemSym*(s: NimNode): bool =
       ln.find("/pure/math.nim(") != -1 or
      ln.find("\\pure\\math.nim(") != -1:
     result = true
+
+proc genIdent*(a: int): string =
+  const
+    firstChars = {'a' .. 'z' }.toSeq() & { 'A' .. 'Z' }.toSeq() & '_'
+    restChars = firstChars & { '0' .. '9' }.toSeq()
+    firstBase = firstChars.len
+    restBase = restChars.len
+
+  # Determine the number of characters needed
+  var x = a
+  var length = 1
+  var maxCount = firstBase
+  var mult = 1
+
+  while x >= maxCount:
+    x -= maxCount
+    mult *= restBase
+    maxCount = mult * firstBase
+    inc(length)
+
+  # Now decode the number using the correct base and length
+  # First character (most significant)
+  result.add firstChars[x div mult]
+
+  # Remaining characters (if any)
+  var rem = x mod mult
+  for i in 1 ..< length:
+    mult = mult div restBase
+    result.add restChars[rem div mult]
+    rem = rem mod mult
+
+template resetPropertyInScope*(property: untyped, value: untyped) =
+  let tmpProp = property
+  property = value
+  defer: property = tmpProp
+
+template resetPropertyInScope*(property: untyped) =
+  var tmpProp: typeof(property)
+  swap(tmpProp, property)
+  defer: swap(property, tmpProp)
+
+when isMainModule:
+  static:
+    doAssert(genIdent(0) == "a")
+    doAssert(genIdent(10100) == "bRE")
+
+  doAssert(genIdent(0) == "a")
+  doAssert(genIdent(10100) == "bRE")

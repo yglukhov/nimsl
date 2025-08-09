@@ -69,7 +69,7 @@ block:
     a.x = 4
 
   chk(getGLSLVertexShader(s), """
-void main(){vec3 a=vec3(1);a.x=4;}
+void main(){vec3 a=vec3(1);a.x=4.0;}
 """)
 
 echo "GLSL Codegen: OK"

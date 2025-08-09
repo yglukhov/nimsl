@@ -5,31 +5,14 @@ type ShaderKind* = enum
   skVertexShader
   skFragmentShader
 
-const pretty = false
-
 type
-  CompilerContext = object
-    procNode: NimNode
+  CompilerContext = object of CompilerContextBase
     isMainProc: bool
-    globalDefs*: seq[string]
     definedSyms: seq[string]
     shaderKind*: ShaderKind
     mainProcName*: string
-    indent: int
+
   GLSLCompilerContext* = CompilerContext
-
-proc indent(c: CompilerContext, r: var string) =
-  when pretty:
-    for i in 0 ..< c.indent:
-      r &= "  "
-
-proc nl(c: CompilerContext, r: var string) =
-  when pretty:
-    r &= "\n"
-
-proc space(c: CompilerContext, r: var string) =
-  when pretty:
-    r &= " "
 
 proc newCtx*(): CompilerContext =
   result.mainProcName = "main"
@@ -294,10 +277,8 @@ precision mediump float;
     ctx.globalDefs.add(globals)
 
 proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
-  let oldNode = ctx.procNode
-  let oldMain = ctx.isMainProc
-  ctx.procNode = n
-  ctx.isMainProc = main
+  resetPropertyInScope(ctx.procNode, n)
+  resetPropertyInScope(ctx.isMainProc, main)
 
   var retType = "void"
   if n.params[0].kind != nnkEmpty:
@@ -347,8 +328,6 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
       r &= "return result;"
   r &= "}"
   ctx.globalDefs.add(r)
-  ctx.procNode = oldNode
-  ctx.isMainProc = oldMain
 
 proc genBlockStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "{"
