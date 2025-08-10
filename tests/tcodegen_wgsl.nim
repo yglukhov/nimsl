@@ -30,22 +30,22 @@ block:
     setVelocity(0, 0, vec2(0, 0))
 
   chk(wgslShader(vsMain), """
-struct VertexOutput {
+struct VertexOutput0 {
   @builtin(position) position: vec4f
 }
 
-struct VertexInput {
+struct VertexInput1 {
   @builtin(vertex_index) idx: u32
 }
 
 
-fn setVelocity0(x: u32, y: u32, v: vec2f) {
+fn setVelocity2(x: u32, y: u32, v: vec2f) {
 }
 
 @vertex
-fn vsMain(input: VertexInput) -> VertexOutput {
-  var result: VertexOutput;
-  setVelocity0(u32(0), u32(0), vec2f(f32(0), f32(0)));
+fn vsMain(input: VertexInput1) -> VertexOutput0 {
+  var result: VertexOutput0;
+  setVelocity2(0u, 0u, vec2f(0.0, 0.0));
   return result;
 }
 """)
@@ -63,19 +63,19 @@ block:
     VertexOutput(position: someConsts[1])
 
   chk(wgslShader(vsMain), """
-struct VertexOutput {
+struct VertexOutput0 {
   @builtin(position) position: vec3f
 }
 
-struct VertexInput {
+struct VertexInput1 {
   @builtin(vertex_index) idx: u32
 }
 
-var<private> someConsts: array<vec3f,2> = array(vec3f(f32(1), f32(2), f32(3)), vec3f(f32(5), f32(5), f32(6)));
+var<private> someConsts2: array<vec3f,2> = array(vec3f(1.0, 2.0, 3.0), vec3f(5.0, 5.0, 6.0));
 
 @vertex
-fn vsMain(input: VertexInput) -> VertexOutput {
-  return VertexOutput(someConsts[1]);
+fn vsMain(input: VertexInput1) -> VertexOutput0 {
+  return VertexOutput0(someConsts2[1]);
 }
 """)
 
@@ -118,14 +118,14 @@ block: # array brackets
       someArray[3] = someArray[2]
 
   chk(wgslShader(vsMain), """
-var<private> someArray: array<bool,20>;
+var<private> someArray0: array<bool,20>;
 
 @vertex
 fn vsMain() {
-  let b = someArray[1];
-  someArray[2] = b;
-  if !(someArray[1]) {
-    someArray[3] = someArray[2];
+  let b = someArray0[1];
+  someArray0[2] = b;
+  if !(someArray0[1]) {
+    someArray0[3] = someArray0[2];
   }
 }
 """)
@@ -174,6 +174,8 @@ block: # ops
       f = e mod 2'f32
     var v = vec4(1)
     v.y = v.y * 2
+    const s = 5.0
+    let vs = vec3(s, s)
 
   chk(wgslShader(vsMain), """
 @vertex
@@ -184,8 +186,9 @@ fn vsMain() {
   let d = !(c);
   let e = 5.0;
   let f = e % 2.0;
-  var v = vec4f(f32(1));
-  v.y = (v.y * f32(2));
+  var v = vec4f(1.0);
+  v.y = (v.y * 2.0);
+  let vs = vec3f(5.0, 5.0);
 }
 """)
 
@@ -201,18 +204,18 @@ block: # typs
     let b = pu.scale
 
   chk(wgslShader(vsMain), """
-var<workgroup> pa: array<vec2f,512>;
+var<workgroup> pa0: array<vec2f,512>;
 
-struct Uniforms {
+struct Uniforms2 {
   scale: f32
 }
 
-var<uniform> pu: Uniforms;
+var<uniform> pu1: Uniforms2;
 
 @vertex
 fn vsMain() {
-  let p = pa[0];
-  let b = pu.scale;
+  let p = pa0[0];
+  let b = pu1.scale;
 }
 """)
 

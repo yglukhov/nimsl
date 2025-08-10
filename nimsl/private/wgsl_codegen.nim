@@ -117,7 +117,7 @@ proc genType(c: var CompilerContext, n: NimNode) =
     rec.expectKind(nnkRecList)
     # echo treeRepr(i)
     var r = "struct "
-    var name = $n
+    let name = c.globalSymName(n)
     r &= name
     c.space(r)
     r &= "{"
@@ -254,7 +254,7 @@ proc genStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   of nnkStmtList:
     # Nested stmtlists don't need extra indent and semicolon
     gen(ctx, n, r)
-  elif n.kind != nnkDiscardStmt or n[0].kind != nnkEmpty:
+  elif (n.kind != nnkDiscardStmt or n[0].kind != nnkEmpty) and n.kind != nnkConstSection:
     ctx.indent(r)
     gen(ctx, n, r)
     if r[^1] != '}':
@@ -518,7 +518,7 @@ proc genGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
     pragmas = name[1]
     genPragmas(ctx, pragmas, r)
     name = name[0]
-  let namestr = $name
+  let namestr = ctx.globalSymName(name)
   ctx.globalSyms[name] = namestr
   r &= "var"
   let varAttrs = globalVarAttrs(pragmas, hasAssignment = val.kind != nnkEmpty)
@@ -558,8 +558,9 @@ proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
       # echo "PROCDEF ", n
       var s = ctx.globalSyms.getOrDefault(n)
       if s == "":
-        s = $n & $ctx.globalIdCounter
-        inc ctx.globalIdCounter
+        s = ctx.globalSymName(n)
+        # s = $n & $ctx.globalIdCounter
+        # inc ctx.globalIdCounter
         ctx.globalSyms[n] = s
         gen(ctx, i, r)
       r &= s
@@ -755,21 +756,35 @@ proc genForStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "}"
 
 proc genConvWithT(ctx: var CompilerContext, n: NimNode, t: NimNode, r: var string) =
-  # let isLit = n.kind in {nnkInt32Lit, nnkUInt32Lit, nnkFloatLit, nnlFloat32Lit}
+  # let isLit = n.kind in {nnkIntLit, nnkInt32Lit, nnkUInt32Lit, nnkFloatLit, nnkFloat32Lit}
   # TODO: Prettier literals. Currently produces e.g. u32(0) instead of 0u
+  # echo "CONV: ", repr n, " ", n.kind
 
   if t.isIdent("uint32"):
-    r &= "u32("
-    gen(ctx, n, r)
-    r &= ")"
+    if n.kind in {nnkIntLit, nnkInt32Lit}:
+      gen(ctx, n, r)
+      r &= "u"
+    else:
+      r &= "u32("
+      gen(ctx, n, r)
+      r &= ")"
   elif t.isIdent("int32"):
-    r &= "i32("
-    gen(ctx, n, r)
-    r &= ")"
+    if n.kind in {nnkIntLit, nnkInt32Lit}:
+      gen(ctx, n, r)
+    else:
+      r &= "i32("
+      gen(ctx, n, r)
+      r &= ")"
   elif t.isIdent("float32"):
-    r &= "f32("
-    gen(ctx, n, r)
-    r &= ")"
+    if n.kind in {nnkIntLit, nnkInt32Lit}:
+      gen(ctx, n, r)
+      r &= ".0"
+    elif n.kind in {nnkFloatLit, nnkFloat32Lit}:
+      gen(ctx, n, r)
+    else:
+      r &= "f32("
+      gen(ctx, n, r)
+      r &= ")"
   elif t.kind == nnkSym and getType(t).kind == nnkEnumTy: # Enums are int32 in wgsl
     r &= "i32("
     gen(ctx, n, r)
@@ -937,6 +952,9 @@ proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
 proc genShader(syms: NimNode): string =
   var c: CompilerContext
   c.pretty = true
+  when defined(nimslTests):
+    c.localMangling = true
+
   for s in syms:
     genProcDef(c, getImpl(s))
     # echo repr getImpl(s)
@@ -951,7 +969,7 @@ macro wgslShader*(syms: varargs[typed]): untyped =
   newLit(genShader(syms))
 
 when wgslOutputPath != "":
-  var c {.compileTime.} = CompilerContext(pretty: not defined(release))
+  var c {.compileTime.} = CompilerContext(pretty: not defined(release), localMangling: false)
 
   proc flushDefs(since: int) =
     writeFile(wgslOutputPath, c.globalDefs.join())

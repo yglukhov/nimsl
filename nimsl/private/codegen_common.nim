@@ -1,10 +1,21 @@
-import std/[macros, strutils, sequtils]
+import std/[macros, strutils, sequtils, tables, hashes]
 
-type CompilerContextBase* = object of RootObj
-  procNode*: NimNode
-  globalDefs*: seq[string]
-  indent*: int
-  pretty*: bool
+type
+  CompilerContextBase* = object of RootObj
+    procNode*: NimNode
+    globalDefs*: seq[string]
+    manglingContext*: ManglingContext
+    indent*: int
+    pretty*: bool
+    localMangling*: bool
+
+  ManglingContext = object
+    globalSyms: Table[NimNode, string]
+    globalSymCounter: int
+
+proc hash(n: NimNode): Hash = hash($n)
+
+var globalManglingContext {.compileTime.}: ManglingContext
 
 proc indent*(c: CompilerContextBase, r: var string) =
   if c.pretty:
@@ -83,6 +94,22 @@ proc genIdent*(a: int): string =
     mult = mult div restBase
     result.add restChars[rem div mult]
     rem = rem mod mult
+
+proc globalSymName(c: var ManglingContext, sym: NimNode, pretty: bool): string =
+  result = c.globalSyms.getOrDefault(sym)
+  if result == "":
+    if pretty:
+      result = $sym & $c.globalSymCounter
+    else:
+      result = genIdent(c.globalSymCounter)
+    c.globalSyms[sym] = result
+    inc c.globalSymCounter
+
+proc globalSymName*(c: var CompilerContextBase, sym: NimNode): string =
+  if c.localMangling:
+    globalSymName(c.manglingContext, sym, c.pretty)
+  else:
+    globalSymName(globalManglingContext, sym, c.pretty)
 
 template resetPropertyInScope*(property: untyped, value: untyped) =
   let tmpProp = property
