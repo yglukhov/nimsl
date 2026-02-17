@@ -176,6 +176,8 @@ block: # ops
     v.y = v.y * 2
     const s = 5.0
     let vs = vec3(s, s)
+    var fv = 4'f32
+    fv *= 2
 
   chk(wgslShader(vsMain), """
 @vertex
@@ -189,6 +191,8 @@ fn vsMain() {
   var v = vec4f(1.0);
   v.y = (v.y * 2.0);
   let vs = vec3f(5.0, 5.0);
+  var fv = 4.0;
+  fv *= 2.0;
 }
 """)
 

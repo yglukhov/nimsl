@@ -1,4 +1,4 @@
-import std/[macros, strutils]
+import std/[macros, strutils, tables]
 import ./[common, lower_exprs, codegen_common]
 
 type ShaderKind* = enum
@@ -8,7 +8,6 @@ type ShaderKind* = enum
 type
   CompilerContext = object of CompilerContextBase
     isMainProc: bool
-    definedSyms: seq[string]
     shaderKind*: ShaderKind
     mainProcName*: string
 
@@ -67,13 +66,15 @@ proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string 
 
 proc genLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
   for i in n:
-    let s = i[0]
+    let s = skipPragma(i[0])
     if i[^2].kind != nnkEmpty:
       r &= getTypeName(ctx, i[^2])
     else:
       r &= getTypeName(ctx, getType(s))
     r &= " "
-    r &= $s
+    let name = $s
+    r &= name
+    ctx.localSyms[s] = name
     if i[2].kind != nnkEmpty:
       r &= "="
       gen(ctx, i[2], r)
@@ -229,6 +230,10 @@ proc genGLSLBuiltinSym(n: NimNode): string =
   of "newVec4": result = "vec4"
   else: result = pn
 
+proc genGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
+  echo repr n
+  doAssert(false, "Not implemented")
+
 proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
   let i = getImpl(n)
   case i.kind
@@ -236,13 +241,30 @@ proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
     if isMagic(i):
       r &= genGLSLBuiltinSym(n)
     else:
-      #echo "SYMBOL: ", treeRepr(i)
-      if $n notin ctx.definedSyms:
-        ctx.definedSyms.add($n)
+      # echo "PROCDEF ", n
+      var s = ctx.globalSyms.getOrDefault(n)
+      if s == "":
+        s = ctx.globalSymName(n)
+        ctx.globalSyms[n] = s
         gen(ctx, i, r)
-      r &= $n
+      r &= s
+  elif n.isIdent("true"):
+    r &= "true"
+  elif n.isIdent("false"):
+    r &= "false"
+  elif n.symKind == nskEnumField:
+    r &= $n.intVal
   else:
-    r &= $n
+    if i.kind == nnkIdentDefs:
+      var name = ctx.localSyms.getOrDefault(n)
+      if name == "":
+        name = ctx.globalSyms.getOrDefault(n)
+        if name == "":
+          genGlobalVar(ctx, n, i)
+          name = ctx.globalSyms[n]
+      r &= name
+    else:
+      r &= mangleSym(n)
 
 iterator paramsAndTypes*(procNode: NimNode): tuple[name, typ: NimNode] =
   for i in 1 ..< procNode.params.len:
@@ -277,7 +299,10 @@ precision mediump float;
     ctx.globalDefs.add(globals)
 
 proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
+  # echo "PROCDEF: ", treeRepr n
   resetPropertyInScope(ctx.procNode, n)
+  resetPropertyInScope(ctx.indent)
+  resetPropertyInScope(ctx.localSyms)
   resetPropertyInScope(ctx.isMainProc, main)
 
   var retType = "void"
@@ -288,7 +313,13 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
 
   var r = if main: "void" else: retType
   r &= " "
-  r &= (if main: ctx.mainProcName else: $(n[0]))
+
+  var name = if main: ctx.mainProcName else: ctx.globalSyms.getOrDefault(n[0])
+  if name == "":
+    name = $(n[0])
+    ctx.globalSyms[n[0]] = name
+
+  r &= name
   r &= "("
 
   if main:
@@ -313,7 +344,7 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, main = false) =
     else:
       r &= retType
       r &= " result;"
-  
+
   let body = lowerExprs(n.body)
   genStmtList(ctx, body, r)
 

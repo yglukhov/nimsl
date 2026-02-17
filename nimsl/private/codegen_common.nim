@@ -4,6 +4,8 @@ type
   CompilerContextBase* = object of RootObj
     procNode*: NimNode
     globalDefs*: seq[string]
+    globalSyms*: Table[NimNode, string]
+    localSyms*: Table[NimNode, string]
     manglingContext*: ManglingContext
     indent*: int
     pretty*: bool
@@ -120,6 +122,16 @@ template resetPropertyInScope*(property: untyped) =
   var tmpProp: typeof(property)
   swap(tmpProp, property)
   defer: swap(property, tmpProp)
+
+proc mangleSym*(n: NimNode): string =
+  n.expectKind({nnkIdent, nnkSym})
+  result = $n
+  result = result.replace('`', '_')
+
+proc skipPragma*(n: NimNode): NimNode =
+  result = n
+  if n.kind == nnkPragmaExpr:
+    result = n[0]
 
 when isMainModule:
   static:

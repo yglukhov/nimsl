@@ -378,6 +378,7 @@ proc textureStore*[T, C](t: TextureStorage2D[T], coords: VecBase[2, C], v: VecBa
 
    # fn textureSample(t: texture_2d<f32>, s: sampler, coords: vec2<f32>) -> vec4<f32>
 proc textureSample*[T](t: Texture2D[T], s: Sampler, coords: Vec2): Vec4 {.nimslmagic.} = discard
+proc textureSampleGrad*[T](t: Texture2D[T], s: Sampler, coords, ddx, ddy: Vec2): Vec4 {.nimslmagic.} = discard
 # when isMainModule:
 #   import ./private/compiler
 #   compiler.main()

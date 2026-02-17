@@ -5,13 +5,6 @@ proc hash(n: NimNode): Hash = hash($n)
 
 type CompilerContext* = object of CompilerContextBase
   globalIdCounter: int
-  localSyms: Table[NimNode, string]
-  globalSyms: Table[NimNode, string]
-
-proc mangleSym(n: NimNode): string =
-  n.expectKind({nnkIdent, nnkSym})
-  result = $n
-  result = result.replace('`', '_')
 
 proc gen(ctx: var CompilerContext, n: NimNode, r: var string)
 proc genStmtList(ctx: var CompilerContext, n: NimNode, r: var string)
@@ -224,11 +217,6 @@ proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string 
     echo "UNKNOWN TYPE: ", treeRepr(t)
     assert(false, "Unknown type")
 
-proc skipPragma(n: NimNode): NimNode =
-  result = n
-  if n.kind == nnkPragmaExpr:
-    result = n[0]
-
 proc genLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
   for i in n:
     let s = skipPragma(i[0])
@@ -282,6 +270,11 @@ proc genSystemRegularFunctionCall(ctx: var CompilerContext, n: NimNode, r: var s
     gen(ctx, n[i], r)
   r &= ")"
 
+proc skipAddr(n: NimNode): NimNode =
+  result = n
+  while result.kind in {nnkHiddenAddr}:
+    result = result[^1]
+
 proc genSystemCall(ctx: var CompilerContext, n: NimNode, r: var string) =
   let pn = $(n[0])
   case pn
@@ -303,7 +296,13 @@ proc genSystemCall(ctx: var CompilerContext, n: NimNode, r: var string) =
       r &= "-="
       ctx.space(r)
       gen(ctx, n[2], r)
-  of "<=", ">=", "<", ">", "+", "-", "*", "/", "*=", "/=", "+=", "-=", "==", "!=":
+  of "*=", "/=", "+=", "-=":
+    gen(ctx, skipAddr(n[1]), r)
+    ctx.space(r)
+    r &= pn
+    ctx.space(r)
+    gen(ctx, n[2], r)
+  of "<=", ">=", "<", ">", "+", "-", "*", "/", "==", "!=":
     if n.kind == nnkInfix:
       r &= "("
       gen(ctx, n[1], r)
@@ -389,11 +388,6 @@ proc genSystemCall(ctx: var CompilerContext, n: NimNode, r: var string) =
     genSystemRegularFunctionCall(ctx, n, r)
   else:
     echo "UNKNOWN SYSTEM CALL: ", treeRepr(n)
-
-proc skipAddr(n: NimNode): NimNode =
-  result = n
-  while result.kind in {nnkHiddenAddr}:
-    result = result[^1]
 
 proc genCall(ctx: var CompilerContext, n: NimNode, r: var string) =
   if n[0].isMagic() and $n[0] in [".", "nimsl_deriveVectorWithComponents"]:
@@ -559,8 +553,6 @@ proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
       var s = ctx.globalSyms.getOrDefault(n)
       if s == "":
         s = ctx.globalSymName(n)
-        # s = $n & $ctx.globalIdCounter
-        # inc ctx.globalIdCounter
         ctx.globalSyms[n] = s
         gen(ctx, i, r)
       r &= s
@@ -581,11 +573,6 @@ proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
       r &= name
     else:
       r &= mangleSym(n)
-
-iterator paramsAndTypes*(procNode: NimNode): tuple[name, typ: NimNode] =
-  for i in 1 ..< procNode.params.len:
-    for j in 0 .. procNode.params[i].len - 3:
-      yield(procNode.params[i][j], procNode.params[i][^2])
 
 type
   ProcDefFlag = enum
@@ -611,11 +598,11 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] =
   genPragmas(ctx, n.pragma, r)
   ctx.nl(r)
   r &= "fn "
-  var s = ctx.globalSyms.getOrDefault(n[0])
-  if s == "":
-    s = $(n[0])
-    ctx.globalSyms[n[0]] = s
-  r &= s
+  var name = ctx.globalSyms.getOrDefault(n[0])
+  if name == "":
+    name = $(n[0])
+    ctx.globalSyms[n[0]] = name
+  r &= name
   r &= "("
 
   var first = true
