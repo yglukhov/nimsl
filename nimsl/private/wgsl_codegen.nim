@@ -384,7 +384,7 @@ proc genSystemCall(ctx: var CompilerContext, n: NimNode, r: var string) =
       r &= "~("
     gen(ctx, n[1], r)
     r &= ")"
-  of "max", "min", "abs":
+  of "max", "min", "abs", "clamp":
     genSystemRegularFunctionCall(ctx, n, r)
   else:
     echo "UNKNOWN SYSTEM CALL: ", treeRepr(n)

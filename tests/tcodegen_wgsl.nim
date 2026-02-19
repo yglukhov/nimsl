@@ -223,4 +223,21 @@ fn vsMain() {
 }
 """)
 
+block: # clamp
+  proc vsMain() {.vertex.} =
+    let a = 5.0'f32
+    let b = clamp(a, 0.0'f32, 1.0'f32)
+    var c = 0.5'f32
+    c = clamp(c, 0.0'f32, 1.0'f32)
+
+  chk(wgslShader(vsMain), """
+@vertex
+fn vsMain() {
+  let a = 5.0;
+  let b = clamp(a, 0.0, 1.0);
+  var c = 0.5;
+  c = clamp(c, 0.0, 1.0);
+}
+""")
+
 echo "WGSL Codegen: OK"
