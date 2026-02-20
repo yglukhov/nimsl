@@ -240,4 +240,28 @@ fn vsMain() {
 }
 """)
 
+block: # implicit float conversion in if-expression
+  proc vsMain() {.vertex.} =
+    let a = 1.0'f32
+    let b = if true: a else: a + 1.0
+    var c = 0.5'f32
+    c = c + 2.0
+
+  chk(wgslShader(vsMain), """
+@vertex
+fn vsMain() {
+  let a = 1.0;
+  var tmp0: f32;
+  if true {
+    tmp0 = a;
+  }
+  else {
+    tmp0 = (a + 1.0);
+  }
+  let b = tmp0;
+  var c = 0.5;
+  c = (c + 2.0);
+}
+""")
+
 echo "WGSL Codegen: OK"

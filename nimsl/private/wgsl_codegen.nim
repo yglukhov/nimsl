@@ -780,13 +780,17 @@ proc genConvWithT(ctx: var CompilerContext, n: NimNode, t: NimNode, r: var strin
     gen(ctx, n, r)
 
 proc genConv(ctx: var CompilerContext, n: NimNode, r: var string) =
-  # echo "CONV: ",  treeRepr(n)
   if n[0].kind != nnkEmpty:
     genConvWithT(ctx, n[1], n[0], r)
-  elif n.kind == nnkHiddenStdConv:
-    let t = getTypeInst(n)
-    genConvWithT(ctx, n[1], t, r)
+  elif n.kind == nnkHiddenStdConv and n[1].kind in {
+      nnkIntLit, nnkInt8Lit, nnkInt16Lit, nnkInt32Lit, nnkInt64Lit,
+      nnkUIntLit, nnkUInt8Lit, nnkUInt16Lit, nnkUInt32Lit, nnkUInt64Lit,
+      nnkFloatLit, nnkFloat32Lit, nnkFloat64Lit, nnkFloat128Lit}:
+    # Literals need target type info for proper suffix (e.g. IntLit→u32 emits 'u', IntLit→f32 emits '.0')
+    genConvWithT(ctx, n[1], getTypeInst(n), r)
   else:
+    # Complex expressions (Infix, Call, etc.) may lack type info on the HiddenStdConv.
+    # These are implicit float32↔float64 promotions which are no-ops in WGSL (all f32).
     gen(ctx, n[1], r)
 
 proc skipConv(n: NimNode): NimNode =

@@ -275,8 +275,22 @@ proc `==`*[I, T](a, b: VecBase[I, T]): bool {.nimslmagic, inline.} =
     if a[i] != b[i]: return false
   return true
 
-proc max*(v: Vec2, s: float32): Vec2 {.nimslmagic.} = [max(v[0], s), max(v[1], s)].Vec2
-proc min*(v: Vec2, s: float32): Vec2 {.nimslmagic.} = [min(v[0], s), min(v[1], s)].Vec2
+proc max*[I, T](a, b: VecBase[I, T]): VecBase[I, T] {.nimslmagic.} =
+  forEachComponentI(I): result[i] = max(a[i], b[i])
+proc min*[I, T](a, b: VecBase[I, T]): VecBase[I, T] {.nimslmagic.} =
+  forEachComponentI(I): result[i] = min(a[i], b[i])
+proc max*[I, T](v: VecBase[I, T], s: T): VecBase[I, T] {.nimslmagic.} =
+  forEachComponentI(I): result[i] = max(v[i], s)
+proc min*[I, T](v: VecBase[I, T], s: T): VecBase[I, T] {.nimslmagic.} =
+  forEachComponentI(I): result[i] = min(v[i], s)
+proc clamp*[I, T](v, lo, hi: VecBase[I, T]): VecBase[I, T] {.nimslmagic.} =
+  forEachComponentI(I): result[i] = clamp(v[i], lo[i], hi[i])
+proc clamp*[I, T](v: VecBase[I, T], lo, hi: T): VecBase[I, T] {.nimslmagic.} =
+  forEachComponentI(I): result[i] = clamp(v[i], lo, hi)
+proc step*(edge, x: float32): float32 {.nimslmagic.} = (if x < edge: 0.0'f32 else: 1.0'f32)
+proc step*[I, T](edge, x: VecBase[I, T]): VecBase[I, T] {.nimslmagic.} =
+  forEachComponentI(I): result[i] = step(edge[i], x[i])
+
 proc length*(v: Vec2): float32 {.nimslmagic.} = sqrt(v[0] * v[0] + v[1] * v[1])
 
 proc smoothstep*(edge0, edge1, x: float32): float32 {.nimslmagic.} =
