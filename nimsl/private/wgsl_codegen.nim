@@ -131,6 +131,8 @@ proc genType(c: var CompilerContext, n: NimNode) =
         if name.kind == nnkPragmaExpr:
           genPragmas(c, name[1], r)
           name = name[0]
+        if name.kind == nnkPostfix:
+          name = name[1]
         r &= $name
         r &= ":"
         c.space(r)
