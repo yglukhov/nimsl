@@ -1,5 +1,5 @@
 import std/strutils
-import nimsl/nimsl
+import nimsl
 
 proc removeTrailingSpaces(s: string): string =
   for l in s.splitLines():

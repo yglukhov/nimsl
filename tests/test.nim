@@ -1,5 +1,6 @@
 import std/[unittest, times, math]
-import nimsl/[nimsl, emulation]
+import nimsl
+import nimsl/emulation
 
 proc fillAlpha(dist: float32): float32 =
   let d = fwidth(dist)
