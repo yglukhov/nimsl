@@ -76,6 +76,8 @@ proc genPragmas(ctx: var CompilerContext, pragmas: NimNode, r: var string) =
             r &= "instance_index"
           elif cmpIgnoreCase(a, "position") == 0:
             r &= "position"
+          elif cmpIgnoreCase(a, "fragDepth") == 0:
+            r &= "frag_depth"
           r &= ") "
         elif cmpIgnoreStyle(id, "group") == 0:
           r &= "@group("

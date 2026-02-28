@@ -11,6 +11,7 @@ type
     vertexIndex
     instanceIndex
     position
+    fragDepth
 
 template storage* {.pragma.}
 template uniform* {.pragma.}
