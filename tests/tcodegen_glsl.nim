@@ -19,7 +19,7 @@ proc chk(actual, expected: static[string]) =
 
 block:
   proc myVertexShader(a: Vec4): Vec3 =
-    newVec3(1, 0, 0)
+    vec3(1, 0, 0)
 
   chk(getGLSLVertexShader(myVertexShader), """
 attribute vec4 a;void main(){vec3 result=vec4(0.0);result=vec3(1,0,0);gl_Position=result;}

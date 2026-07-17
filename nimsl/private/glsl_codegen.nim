@@ -222,14 +222,6 @@ proc genReturnStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
       r &= " "
       gen(ctx, n[0][1], r)
 
-proc genGLSLBuiltinSym(n: NimNode): string =
-  let pn = $n
-  case pn
-  of "newVec2": result = "vec2"
-  of "newVec3": result = "vec3"
-  of "newVec4": result = "vec4"
-  else: result = pn
-
 proc genGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
   echo repr n
   doAssert(false, "Not implemented")
@@ -239,7 +231,7 @@ proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
   case i.kind
   of nnkProcDef:
     if isMagic(i):
-      r &= genGLSLBuiltinSym(n)
+      r &= $n
     else:
       # echo "PROCDEF ", n
       var s = ctx.globalSyms.getOrDefault(n)

@@ -4,7 +4,6 @@ import ./[common, lower_exprs, codegen_common]
 proc hash(n: NimNode): Hash = hash($n)
 
 type CompilerContext* = object of CompilerContextBase
-  globalIdCounter: int
 
 proc gen(ctx: var CompilerContext, n: NimNode, r: var string)
 proc genStmtList(ctx: var CompilerContext, n: NimNode, r: var string)
