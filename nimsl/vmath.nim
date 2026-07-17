@@ -327,7 +327,7 @@ proc validateAttrs(s: string, sourceLen: int) {.compileTime.} =
           validChars.incl({'w', 'a'})
 
   for c in s:
-    assert(c in validChars, "Invalid vector component: " & $c)
+    doAssert(c in validChars, "Invalid vector component \"" & $c & "\" or function \"" & s & "\" is not defined")
 
 proc nimsl_deriveVectorWithComponents[I, T](v: VecBase[I, T], f: static[string]): VecBase[f.len, T] {.nimslmagic, inline.} =
   static: validateAttrs(f, I)

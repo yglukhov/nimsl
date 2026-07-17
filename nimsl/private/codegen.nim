@@ -3,7 +3,34 @@ import ./[common, lower_exprs, codegen_common]
 
 proc hash(n: NimNode): Hash = hash($n)
 
-type CompilerContext* = object of CompilerContextBase
+type
+  ShaderLanguage* = enum
+    slGLSL
+    slWGSL
+
+  ShaderKind* = enum
+    skVertexShader
+    skFragmentShader
+
+  CompilerContext* = object of CompilerContextBase
+    shaderLanguage*: ShaderLanguage
+    isMainProc: bool
+    shaderKind*: ShaderKind
+    mainProcName*: string
+
+  GLSLCompilerContext* = CompilerContext
+
+proc newCtx*(shaderLanguage = slGLSL): CompilerContext =
+  result.shaderLanguage = shaderLanguage
+  result.mainProcName = "main"
+
+proc slSel[T](ctx: CompilerContext, glsl, wgsl: T): T =
+  case ctx.shaderLanguage
+  of slGLSL: glsl
+  of slWGSL: wgsl
+
+proc isGLSL(c: CompilerContext): bool = c.shaderLanguage == slGLSL
+proc isWGSL(c: CompilerContext): bool = c.shaderLanguage == slWGSL
 
 proc gen(ctx: var CompilerContext, n: NimNode, r: var string)
 proc genStmtList(ctx: var CompilerContext, n: NimNode, r: var string)
@@ -34,6 +61,8 @@ proc varAttrs(pragmas: NimNode): seq[string] =
       discard
 
 proc genPragmas(ctx: var CompilerContext, pragmas: NimNode, r: var string) =
+  if ctx.shaderLanguage != slWGSL:
+    return
   for p in pragmas:
     case p.kind
     of nnkSym, nnkIdent:
@@ -94,12 +123,14 @@ proc genPragmas(ctx: var CompilerContext, pragmas: NimNode, r: var string) =
               ctx.space(r)
             r &= $p[i].intVal
           r &= ") "
-        # else:
-        #   echo "PRAGMA: ", treerepr p
     else:
       discard
 
 proc genType(c: var CompilerContext, n: NimNode) =
+  if c.shaderLanguage != slWGSL:
+    c.globalSyms[n] = $n
+    return
+
   let i = getImpl(n)
   i.expectKind(nnkTypeDef)
   resetPropertyInScope(c.indent)
@@ -109,7 +140,6 @@ proc genType(c: var CompilerContext, n: NimNode) =
   of nnkObjectTy:
     let rec = o[2]
     rec.expectKind(nnkRecList)
-    # echo treeRepr(i)
     var r = "struct "
     let name = c.globalSymName(n)
     r &= name
@@ -158,24 +188,28 @@ proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string 
   of nnkBracketExpr:
     let t0 = $t[0]
     if t0 == "array" and t[1].rangeLen == 2 and $t[2] == "float32":
-      result = "vec2f"
+      result = ctx.slSel(wgsl = "vec2f", glsl = "vec2")
     elif t0 == "array" and t[1].rangeLen == 3 and $t[2] == "float32":
-      result = "vec3f"
+      result = ctx.slSel(wgsl = "vec3f", glsl = "vec3")
     elif t0 == "array" and t[1].rangeLen == 4 and $t[2] == "float32":
-      result = "vec4f"
+      result = ctx.slSel(wgsl = "vec4f", glsl = "vec4")
     elif t0 == "array":
-      result = "array<" & getTypeName(ctx, t[2], skipVar) & "," & $(t[1].rangeLen) & ">"
+      if ctx.shaderLanguage == slWGSL:
+        result = "array<" & getTypeName(ctx, t[2], skipVar) & "," & $(t[1].rangeLen) & ">"
+      else:
+        echo "Unknown type: ", treeRepr(t)
+        assert(false, "Unknown type")
     elif t0 == "distinct":
       result = getTypeName(ctx, t[1], skipVar)
-    elif t0 == "seq":
+    elif t0 == "seq" and ctx.shaderLanguage == slWGSL:
       result = "array<"
       result &= getTypeName(ctx, t[1], skipVar)
       result &= ">"
-    elif t0 == "Texture2D":
+    elif t0 == "Texture2D" and ctx.shaderLanguage == slWGSL:
       result = "texture_2d<"
       result &= getTypeName(ctx, t[1], skipVar)
       result &= ">"
-    elif t0 == "TextureStorage2D":
+    elif t0 == "TextureStorage2D" and ctx.shaderLanguage == slWGSL:
       result = "texture_storage_2d<"
       result &= "r8uint"
       # result &= getTypeName(ctx, t[1], skipVar)
@@ -188,39 +222,48 @@ proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string 
     case $t
     of "VecBase": result = getTypeName(ctx, getType(t), skipVar)
     of "Texture2D": result = getTypeName(ctx, getType(t), skipVar)
-    of "float32": result = "f32"
-    of "int32": result = "i32"
-    of "uint32": result = "u32"
+    of "float32": result = ctx.slSel(wgsl = "f32", glsl = "float")
+    of "int32": result = ctx.slSel(wgsl = "i32", glsl = "int")
+    of "uint32": result = ctx.slSel(wgsl = "u32", glsl = "uint")
     of "bool": result = "bool"
-    of "Vec2", "vec2": result = "vec2f"
-    of "Vec3", "vec3": result = "vec3f"
-    of "Vec4", "vec4": result = "vec4f"
-    of "Vec2i", "ivec2": result = "vec2i"
-    of "Vec3i", "ivec3": result = "vec3i"
-    of "Vec4i", "ivec4": result = "vec4i"
-    of "Vec2u", "uvec2": result = "vec2u"
-    of "Vec3u", "uvec3": result = "vec3u"
-    of "Vec4u", "uvec4": result = "vec4u"
-    of "Vec2b", "bvec2": result = "vec2<bool>"
-    of "Vec3b", "bvec3": result = "vec3<bool>"
-    of "Vec4b", "bvec4": result = "vec4<bool>"
-    of "Mat3", "mat3": result = "mat3x3f"
-    of "Mat4", "mat4": result = "mat4x4f"
+    of "Vec2", "vec2": result = ctx.slSel(wgsl = "vec2f", glsl = "vec2")
+    of "Vec3", "vec3": result = ctx.slSel(wgsl = "vec3f", glsl = "vec3")
+    of "Vec4", "vec4": result = ctx.slSel(wgsl = "vec4f", glsl = "vec4")
+    of "Vec2i", "ivec2": result = ctx.slSel(wgsl = "vec2i", glsl = "ivec2")
+    of "Vec3i", "ivec3": result = ctx.slSel(wgsl = "vec3i", glsl = "ivec3")
+    of "Vec4i", "ivec4": result = ctx.slSel(wgsl = "vec4i", glsl = "ivec4")
+    of "Vec2u", "uvec2": result = ctx.slSel(wgsl = "vec2u", glsl = "uvec2")
+    of "Vec3u", "uvec3": result = ctx.slSel(wgsl = "vec3u", glsl = "uvec3")
+    of "Vec4u", "uvec4": result = ctx.slSel(wgsl = "vec4u", glsl = "uvec4")
+    of "Vec2d", "dvec2": result = "dvec2"
+    of "Vec3d", "dvec3": result = "dvec3"
+    of "Vec4d", "dvec4": result = "dvec4"
+    of "Vec2b", "bvec2": result = ctx.slSel(wgsl = "vec2<bool>", glsl = "bvec2")
+    of "Vec3b", "bvec3": result = ctx.slSel(wgsl = "vec3<bool>", glsl = "bvec3")
+    of "Vec4b", "bvec4": result = ctx.slSel(wgsl = "vec4<bool>", glsl = "bvec4")
+    of "Mat3", "mat3": result = ctx.slSel(wgsl = "mat3x3f", glsl = "mat3")
+    of "Mat4", "mat4": result = ctx.slSel(wgsl = "mat4x4f", glsl = "mat4")
     of "Sampler": result = "sampler"
     else:
-      result = ctx.globalSyms.getOrDefault(t)
-      if result == "":
-        genType(ctx, t)
-        result = ctx.globalSyms[t]
+      if ctx.shaderLanguage == slWGSL:
+        result = ctx.globalSyms.getOrDefault(t)
+        if result == "":
+          genType(ctx, t)
+          result = ctx.globalSyms[t]
+      else:
+        result = $t
   of nnkVarTy:
     result = getTypeName(ctx, t[0])
     if not skipVar:
-      result = "ptr<function, " & result & ">"
+      if ctx.shaderLanguage == slWGSL:
+        result = "ptr<function, " & result & ">"
+      else:
+        result = "inout " & result
   else:
     echo "UNKNOWN TYPE: ", treeRepr(t)
     assert(false, "Unknown type")
 
-proc genLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
+proc genWGSLLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
   for i in n:
     let s = skipPragma(i[0])
     r &= (if n.kind == nnkLetSection: "let " else: "var ")
@@ -235,20 +278,39 @@ proc genLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
     else:
       r &= ":"
       ctx.space(r)
-      # if s.kind == nnkIdent:
       r &= getTypeName(ctx, i[1])
-      # else:
-      #   r &= getTypeName(ctx, getType(s))
+
+proc genGLSLLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
+  for i in n:
+    let s = skipPragma(i[0])
+    if i[^2].kind != nnkEmpty:
+      r &= getTypeName(ctx, i[^2])
+    else:
+      r &= getTypeName(ctx, getType(s))
+    r &= " "
+    let name = $s
+    r &= name
+    ctx.localSyms[s] = name
+    if i[2].kind != nnkEmpty:
+      r &= "="
+      gen(ctx, i[2], r)
+
+proc genLetSection(ctx: var CompilerContext, n: NimNode, r: var string) =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLLetSection(ctx, n, r)
+  of slGLSL: genGLSLLetSection(ctx, n, r)
 
 proc genStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   case n.kind
   of nnkStmtList:
     # Nested stmtlists don't need extra indent and semicolon
     gen(ctx, n, r)
-  elif (n.kind != nnkDiscardStmt or n[0].kind != nnkEmpty) and n.kind != nnkConstSection:
+  else:
+    if (n.kind == nnkDiscardStmt and n[0].kind == nnkEmpty) or n.kind == nnkConstSection:
+      return
     ctx.indent(r)
     gen(ctx, n, r)
-    if r[^1] != '}':
+    if r.len > 0 and r[^1] != '}':
       r &= ";"
     ctx.nl(r)
 
@@ -477,21 +539,45 @@ proc genAsgn(ctx: var CompilerContext, n: NimNode, r: var string) =
   gen(ctx, n[1], r)
 
 proc genReturnStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
-  r &= "return"
-  if n[0].kind == nnkEmpty:
-    if ctx.procNode.params[0].kind != nnkEmpty:
-      r &= " result"
+  if ctx.isGLSL and ctx.isMainProc:
+    if ctx.procNode.params[0].kind == nnkEmpty:
+      r &= "return"
+    else:
+      if ctx.shaderKind == skVertexShader:
+        r &= "gl_Position"
+      else:
+        r &= "gl_FragColor"
+      r &= "="
+      if n[0].kind == nnkEmpty:
+        r &= "result"
+      else:
+        n[0].expectKind(nnkAsgn)
+        gen(ctx, n[0][1], r)
+      r &= ";return"
   else:
-    r &= " "
-    gen(ctx, n[0][1], r)
+    r &= "return"
+    if n[0].kind == nnkEmpty:
+      if ctx.procNode.params[0].kind != nnkEmpty:
+        r &= " result"
+    else:
+      r &= " "
+      gen(ctx, n[0][1], r)
 
-proc genGLSLBuiltinSym(n: NimNode): string =
+proc genWGSLBuiltinSym(n: NimNode): string =
   let pn = $n
   case pn
   of "newVec2", "vec2": result = "vec2f"
   of "newVec3", "vec3": result = "vec3f"
   of "newVec4", "vec4": result = "vec4f"
   else: result = pn
+
+proc genGLSLBuiltinSym(n: NimNode): string =
+  result = $n
+
+proc genBuiltinSym(ctx: var CompilerContext, n: NimNode): string =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLBuiltinSym(n)
+  of slGLSL: genGLSLBuiltinSym(n)
 
 proc globalVarAttrs(pragmas: NimNode, hasAssignment: bool): seq[string] =
   const addressSpaces = ["function", "private", "workgroup", "uniform", "storage", "handle"]
@@ -505,10 +591,9 @@ proc globalVarAttrs(pragmas: NimNode, hasAssignment: bool): seq[string] =
     if not addressSpaceDefined:
       result.add("private")
 
-proc genGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
+proc genWGSLGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
   var r = ""
   var name = idDefs[0]
-  let typ = idDefs[^2]
   let val = idDefs[^1]
   var pragmas: NimNode
   if name.kind == nnkPragmaExpr:
@@ -545,12 +630,21 @@ proc genGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
   ctx.nl(r)
   ctx.globalDefs &= r
 
+proc genGLSLGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
+  echo repr n
+  doAssert(false, "Not implemented")
+
+proc genGlobalVar(ctx: var CompilerContext, n, idDefs: NimNode) =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLGlobalVar(ctx, n, idDefs)
+  of slGLSL: genGLSLGlobalVar(ctx, n, idDefs)
+
 proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
   let i = getImpl(n)
   case i.kind
   of nnkProcDef:
     if isMagic(i):
-      r &= genGLSLBuiltinSym(n)
+      r &= genBuiltinSym(ctx, n)
     else:
       # echo "PROCDEF ", n
       var s = ctx.globalSyms.getOrDefault(n)
@@ -577,21 +671,106 @@ proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
     else:
       r &= mangleSym(n)
 
+iterator paramsAndTypes*(procNode: NimNode): tuple[name, typ: NimNode] =
+  for i in 1 ..< procNode.params.len:
+    for j in 0 .. procNode.params[i].len - 3:
+      yield(procNode.params[i][j], procNode.params[i][^2])
+
+proc genGLSLGlobals(ctx: var CompilerContext, n: NimNode) =
+  # n is the main proc def. collect uniforms, varyings and attributes
+  var globals = ""
+  if ctx.shaderKind == skFragmentShader:
+    globals = """
+#ifdef GL_ES
+#extension GL_OES_standard_derivatives : enable
+precision mediump float;
+#endif
+"""
+  for param in n.paramsAndTypes:
+    let paramName = $param.name
+    if paramName.startsWith("v"):
+      globals &= "varying "
+    elif paramName.startsWith("a"):
+      globals &= "attribute "
+    else:
+      globals &= "uniform "
+
+    globals &= getTypeName(ctx, param.typ, true)
+    globals &= " "
+    globals &= paramName
+    globals &= ";"
+
+  if globals.len > 0:
+    ctx.globalDefs.add(globals)
+
 type
-  ProcDefFlag = enum
+  ProcDefFlag* = enum
     forceVertex
     forceFragment
     forceCompute
 
-proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] = {}) =
-  # echo "PROCDEF: ", treeRepr n
-  resetPropertyInScope(ctx.procNode, n)
-  resetPropertyInScope(ctx.indent)
-  resetPropertyInScope(ctx.localSyms)
-
+proc genGLSLProcDef(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag], main: bool) =
   var retType = "void"
   if n.params[0].kind != nnkEmpty:
     retType = getTypeName(ctx, n.params[0])
+
+  let hasResult = n.params[0].kind != nnkEmpty
+
+  var r = if main: "void" else: retType
+  r &= " "
+
+  var name = if main: ctx.mainProcName else: ctx.globalSyms.getOrDefault(n[0])
+  if name == "":
+    name = $(n[0])
+    ctx.globalSyms[n[0]] = name
+
+  r &= name
+  r &= "("
+
+  if main:
+    genGLSLGlobals(ctx, n)
+  else:
+    var first = true
+    for i in 1 ..< n.params.len:
+      for j in 0 .. n.params[i].len - 3:
+        if first:
+          first = false
+        else:
+          r &= ","
+        r &= getTypeName(ctx, n.params[i][^2])
+        r &= " "
+        r &= $(n.params[i][j])
+  r &= "){"
+  if hasResult:
+    if main:
+      r &= retType
+      r &= " result"
+      r &= "=vec4(0.0);"
+    else:
+      r &= retType
+      r &= " result;"
+
+  let body = lowerExprs(n.body)
+  genStmtList(ctx, body, r)
+
+  if hasResult:
+    if main:
+      case ctx.shaderKind
+      of skVertexShader:
+        r &= "gl_Position=result;"
+      of skFragmentShader:
+        r &= "gl_FragColor=result;"
+    else:
+      r &= "return result;"
+  r &= "}"
+  ctx.globalDefs.add(r)
+
+proc genWGSLProcDef(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag], main: bool) =
+  var retType = "void"
+  if n.params[0].kind != nnkEmpty:
+    retType = getTypeName(ctx, n.params[0])
+
+  let hasResult = n.params[0].kind != nnkEmpty
 
   var r: string
   if forceCompute in flags: r &= "@compute "
@@ -632,8 +811,6 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] =
   inc ctx.indent
   let body = lowerExprs(n.body)
 
-  let hasResult = n.params[0].kind != nnkEmpty
-
   if hasResult and body.kind == nnkAsgn and body[0].isIdent("result"):
     ctx.indent(r)
     r &= "return "
@@ -649,7 +826,7 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] =
       r &= ";"
       ctx.nl(r)
     genStmtList(ctx, body, r)
-    if hasResult: # and not main:
+    if hasResult:
       ctx.indent(r)
       r &= "return result;"
       ctx.nl(r)
@@ -658,6 +835,17 @@ proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] =
   ctx.nl(r)
   ctx.nl(r)
   ctx.globalDefs.add(r)
+
+proc genProcDef*(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag] = {}, main = false) =
+  # echo "PROCDEF: ", treeRepr n
+  resetPropertyInScope(ctx.procNode, n)
+  resetPropertyInScope(ctx.indent)
+  resetPropertyInScope(ctx.localSyms)
+  resetPropertyInScope(ctx.isMainProc, main)
+
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLProcDef(ctx, n, flags, main)
+  of slGLSL: genGLSLProcDef(ctx, n, flags, main)
 
 proc genBlockStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "{"
@@ -705,7 +893,13 @@ proc genForStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
 
   r &= "for"
   ctx.space(r)
-  r &= "(var "
+  r &= "("
+  case ctx.shaderLanguage
+  of slGLSL:
+    r &= ctx.getTypeName(n[0])
+    r &= " "
+  of slWGSL:
+    r &= "var "
   r &= s
   ctx.space(r)
   r &= "="
@@ -782,7 +976,7 @@ proc genConvWithT(ctx: var CompilerContext, n: NimNode, t: NimNode, r: var strin
   else:
     gen(ctx, n, r)
 
-proc genConv(ctx: var CompilerContext, n: NimNode, r: var string) =
+proc genWGSLConv(ctx: var CompilerContext, n: NimNode, r: var string) =
   if n[0].kind != nnkEmpty:
     genConvWithT(ctx, n[1], n[0], r)
   elif n.kind == nnkHiddenStdConv and n[1].kind in {
@@ -796,13 +990,20 @@ proc genConv(ctx: var CompilerContext, n: NimNode, r: var string) =
     # These are implicit float32↔float64 promotions which are no-ops in WGSL (all f32).
     gen(ctx, n[1], r)
 
+proc genGLSLConv(ctx: var CompilerContext, n: NimNode, r: var string) =
+  gen(ctx, n[1], r)
+
+proc genConv(ctx: var CompilerContext, n: NimNode, r: var string) =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLConv(ctx, n, r)
+  of slGLSL: genGLSLConv(ctx, n, r)
+
 proc skipConv(n: NimNode): NimNode =
   result = n
   while result.kind == nnkHiddenStdConv:
     result = result[^1]
 
 proc genBracketExpr(ctx: var CompilerContext, n: NimNode, r: var string) =
-  # let indexVal = n[1].skipConv.intVal
   gen(ctx, n[0], r)
   r &= "["
   gen(ctx, n[1], r)
@@ -819,13 +1020,22 @@ proc genIfStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   for c in n:
     if c.kind == nnkElifBranch:
       if first:
-        r &= "if "
+        r &= "if"
         first = false
       else:
         ctx.nl(r)
         ctx.indent(r)
-        r &= "else if "
+        r &= "else if"
+      case ctx.shaderLanguage
+      of slGLSL:
+        ctx.space(r)
+        r &= "("
+      of slWGSL:
+        r &= " "
       gen(ctx, c[0], r)
+      case ctx.shaderLanguage
+      of slGLSL: r &= ")"
+      of slWGSL: discard
       ctx.space(r)
       r &= "{"
       ctx.nl(r)
@@ -887,13 +1097,32 @@ proc genCaseStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   ctx.indent(r)
   r &= "}"
 
-proc genIntLit(ctx: var CompilerContext, n: NimNode, r: var string) =
+proc genWGSLIntLit(ctx: var CompilerContext, n: NimNode, r: var string) =
   let t = n.getTypeInst()
-  r &= $(n.intVal)
+  r &= $n.intVal
   if t.isIdent("uint32"):
     r &= "u"
 
-proc genHiddenDeref(ctx: var CompilerContext, n: NimNode, r: var string) =
+proc genGLSLIntLit(ctx: var CompilerContext, n: NimNode, r: var string) =
+  r &= $n.intVal
+
+proc genIntLit(ctx: var CompilerContext, n: NimNode, r: var string) =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLIntLit(ctx, n, r)
+  of slGLSL: genGLSLIntLit(ctx, n, r)
+
+proc genWGSLUInt32Lit(ctx: var CompilerContext, n: NimNode, r: var string) =
+  r &= $n.intVal & "u"
+
+proc genGLSLUInt32Lit(ctx: var CompilerContext, n: NimNode, r: var string) =
+  r &= $n.intVal
+
+proc genUInt32Lit(ctx: var CompilerContext, n: NimNode, r: var string) =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLUInt32Lit(ctx, n, r)
+  of slGLSL: genGLSLUInt32Lit(ctx, n, r)
+
+proc genWGSLHiddenDeref(ctx: var CompilerContext, n: NimNode, r: var string) =
   if n[^1].kind in {nnkIdent, nnkSym}:
     r &= "(*"
     gen(ctx, n[0], r)
@@ -901,10 +1130,26 @@ proc genHiddenDeref(ctx: var CompilerContext, n: NimNode, r: var string) =
   else:
     gen(ctx, n[0], r)
 
-proc genHiddenAddr(ctx: var CompilerContext, n: NimNode, r: var string) =
+proc genGLSLHiddenDeref(ctx: var CompilerContext, n: NimNode, r: var string) =
+  gen(ctx, n[0], r)
+
+proc genHiddenDeref(ctx: var CompilerContext, n: NimNode, r: var string) =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLHiddenDeref(ctx, n, r)
+  of slGLSL: genGLSLHiddenDeref(ctx, n, r)
+
+proc genWGSLHiddenAddr(ctx: var CompilerContext, n: NimNode, r: var string) =
   r &= "(&"
   gen(ctx, n[0], r)
   r &= ")"
+
+proc genGLSLHiddenAddr(ctx: var CompilerContext, n: NimNode, r: var string) =
+  gen(ctx, n[0], r)
+
+proc genHiddenAddr(ctx: var CompilerContext, n: NimNode, r: var string) =
+  case ctx.shaderLanguage
+  of slWGSL: genWGSLHiddenAddr(ctx, n, r)
+  of slGLSL: genGLSLHiddenAddr(ctx, n, r)
 
 proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
   case n.kind:
@@ -916,9 +1161,9 @@ proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
   of nnkBracket: genBracket(ctx, n, r)
   of nnkInfix: genInfixCall(ctx, n, r)
   of nnkPrefix: genPrefixCall(ctx, n, r)
-  of nnkFloatLit, nnkFloat64Lit, nnkFloat32Lit: r &= $(n.floatVal)
+  of nnkFloatLit, nnkFloat64Lit, nnkFloat32Lit: r &= $n.floatVal
   of nnkIntLit, nnkInt32Lit: genIntLit(ctx, n, r)
-  of nnkUInt32Lit: r &= $(n.intVal) & "u"
+  of nnkUInt32Lit: genUInt32Lit(ctx, n, r)
   of nnkAsgn, nnkFastAsgn: genAsgn(ctx, n, r)
   of nnkSym: genSym(ctx, n, r)
   of nnkReturnStmt: genReturnStmt(ctx, n, r)
@@ -944,7 +1189,7 @@ proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
     echo treeRepr(n)
 
 proc genShader(syms: NimNode): string =
-  var c: CompilerContext
+  var c = newCtx(slWGSL)
   c.pretty = true
   when defined(nimslTests):
     c.localMangling = true
@@ -963,7 +1208,7 @@ macro wgslShader*(syms: varargs[typed]): untyped =
   newLit(genShader(syms))
 
 when wgslOutputPath != "":
-  var c {.compileTime.} = CompilerContext(pretty: not defined(release), localMangling: false)
+  var c {.compileTime.} = CompilerContext(shaderLanguage: slWGSL, pretty: not defined(release), localMangling: false)
 
   proc flushDefs(since: int) =
     writeFile(wgslOutputPath, c.globalDefs.join())

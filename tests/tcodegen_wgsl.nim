@@ -178,6 +178,7 @@ block: # ops
     let vs = vec3(s, s)
     var fv = 4'f32
     fv *= 2
+    let swiz = v.xyz
 
   chk(wgslShader(vsMain), """
 @vertex
@@ -193,6 +194,7 @@ fn vsMain() {
   let vs = vec3f(5.0, 5.0);
   var fv = 4.0;
   fv *= 2.0;
+  let swiz = v.xyz;
 }
 """)
 

@@ -1,21 +1,20 @@
 import std/[macros, math]
 import ./nimsl/private/common
-from ./nimsl/private/glsl_codegen import nil
-import ./nimsl/private/wgsl_codegen as wgsl
+import ./nimsl/private/codegen
 
 
 when wgslOutputPath != "" or glslOutputPath != "":
   macro vertex*(u: typed): untyped =
     when wgslOutputPath != "":
-      wgsl.singleVertexShader(u)
+      codegen.singleVertexShader(u)
 
   macro fragment*(u: typed): untyped =
     when wgslOutputPath != "":
-      wgsl.singleFragmentShader(u)
+      codegen.singleFragmentShader(u)
 
   macro compute*(u: typed): untyped =
     when wgslOutputPath != "":
-      wgsl.singleComputeShader(u)
+      codegen.singleComputeShader(u)
 
 else:
   template compute* {.pragma.}
@@ -23,27 +22,27 @@ else:
   template fragment* {.pragma.}
 
 export common
-export wgsl.wgslShader
+export codegen.wgslShader
 
 type
   Texture2D*[T] = object
   TextureStorage2D*[T] = object
   Sampler* = object
 
-proc getGLSLShaderCode(s: NimNode, k: glsl_codegen.ShaderKind, mainProcName: string): string =
-  var ctx = glsl_codegen.newCtx()
+proc getGLSLShaderCode(s: NimNode, k: ShaderKind, mainProcName: string): string =
+  var ctx = newCtx(slGLSL)
   ctx.mainProcName = mainProcName
   ctx.shaderKind = k
-  glsl_codegen.genProcDef(ctx, getImpl(s), true)
+  genProcDef(ctx, getImpl(s), main = true)
   result = ""
   for i in ctx.globalDefs:
     result &= i
 
-macro getGLSLFragmentShader*(s: typed{nkSym}, mainProcName: string = "main"): string =
-  result = newLit(getGLSLShaderCode(s, glsl_codegen.skFragmentShader, mainProcName.strVal))
+macro getGLSLFragmentShader*(s: typed{nkSym}, mainProcName: static[string] = "main"): string =
+  result = newLit(getGLSLShaderCode(s, skFragmentShader, mainProcName))
 
 macro getGLSLVertexShader*(s: typed{nkSym}): string =
-  result = newLit(getGLSLShaderCode(s, glsl_codegen.skVertexShader, "main"))
+  result = newLit(getGLSLShaderCode(s, skVertexShader, "main"))
 
 import ./nimsl/vmath
 export vmath
