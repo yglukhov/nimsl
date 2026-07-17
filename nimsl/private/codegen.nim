@@ -127,10 +127,6 @@ proc genPragmas(ctx: var CompilerContext, pragmas: NimNode, r: var string) =
       discard
 
 proc genType(c: var CompilerContext, n: NimNode) =
-  if c.shaderLanguage != slWGSL:
-    c.globalSyms[n] = $n
-    return
-
   let i = getImpl(n)
   i.expectKind(nnkTypeDef)
   resetPropertyInScope(c.indent)
@@ -220,8 +216,7 @@ proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string 
       assert(false, "Unknown type")
   of nnkSym:
     case $t
-    of "VecBase": result = getTypeName(ctx, getType(t), skipVar)
-    of "Texture2D": result = getTypeName(ctx, getType(t), skipVar)
+    of "VecBase", "Texture2D": result = getTypeName(ctx, getType(t), skipVar)
     of "float32": result = ctx.slSel(wgsl = "f32", glsl = "float")
     of "int32": result = ctx.slSel(wgsl = "i32", glsl = "int")
     of "uint32": result = ctx.slSel(wgsl = "u32", glsl = "uint")
@@ -245,20 +240,16 @@ proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string 
     of "Mat4", "mat4": result = ctx.slSel(wgsl = "mat4x4f", glsl = "mat4")
     of "Sampler": result = "sampler"
     else:
-      if ctx.shaderLanguage == slWGSL:
-        result = ctx.globalSyms.getOrDefault(t)
-        if result == "":
-          genType(ctx, t)
-          result = ctx.globalSyms[t]
-      else:
-        result = $t
+      result = ctx.globalSyms.getOrDefault(t)
+      if result == "":
+        genType(ctx, t)
+        result = ctx.globalSyms[t]
   of nnkVarTy:
     result = getTypeName(ctx, t[0])
     if not skipVar:
-      if ctx.shaderLanguage == slWGSL:
-        result = "ptr<function, " & result & ">"
-      else:
-        result = "inout " & result
+      result = case ctx.shaderLanguage
+      of slGLSL: "inout " & result
+      of slWGSL: "ptr<function, " & result & ">"
   else:
     echo "UNKNOWN TYPE: ", treeRepr(t)
     assert(false, "Unknown type")
@@ -325,16 +316,6 @@ proc genStmtListExpr(ctx: var CompilerContext, n: NimNode, r: var string) =
   for i in n:
     gen(ctx, i, r)
 
-proc genSystemRegularFunctionCall(ctx: var CompilerContext, n: NimNode, r: var string) =
-  r &= $(n[0])
-  r &= "("
-  for i in 1 ..< n.len:
-    if i != 1:
-      r &= ","
-      ctx.space(r)
-    gen(ctx, n[i], r)
-  r &= ")"
-
 proc skipAddr(n: NimNode): NimNode =
   result = n
   while result.kind in {nnkHiddenAddr}:
@@ -361,118 +342,151 @@ proc genSystemCall(ctx: var CompilerContext, n: NimNode, r: var string) =
       r &= "-="
       ctx.space(r)
       gen(ctx, n[2], r)
-  of "*=", "/=", "+=", "-=":
-    gen(ctx, skipAddr(n[1]), r)
-    ctx.space(r)
-    r &= pn
-    ctx.space(r)
-    gen(ctx, n[2], r)
-  of "<=", ">=", "<", ">", "+", "-", "*", "/", "==", "!=":
-    if n.kind == nnkInfix:
-      r &= "("
-      gen(ctx, n[1], r)
-      ctx.space(r)
-      r &= pn
-      ctx.space(r)
-      gen(ctx, n[2], r)
-      r &= ")"
-    elif n.kind == nnkPrefix:
-      r &= pn
-      gen(ctx, n[1], r)
-    else:
-      assert(false)
-  of "and":
-    r &= "("
-    gen(ctx, n[1], r)
-    ctx.space(r)
-    if getType(n).isIdent("bool"):
-      r &= "&&"
-    else:
-      r &= "&"
-    ctx.space(r)
-    gen(ctx, n[2], r)
-    r &= ")"
-  of "or":
-    r &= "("
-    gen(ctx, n[1], r)
-    ctx.space(r)
-    if getType(n).isIdent("bool"):
-      r &= "||"
-    else:
-      r &= "|"
-    ctx.space(r)
-    gen(ctx, n[2], r)
-    r &= ")"
-  of "xor":
-    r &= "("
-    gen(ctx, n[1], r)
-    ctx.space(r)
-    if getType(n).isIdent("bool"):
-      r &= "^"
-    else:
-      r &= "^"
-    ctx.space(r)
-    gen(ctx, n[2], r)
-    r &= ")"
-  of "shl":
-    r &= "("
-    gen(ctx, n[1], r)
-    ctx.space(r)
-    r &= "<<"
-    ctx.space(r)
-    gen(ctx, n[2], r)
-    r &= ")"
-  of "shr":
-    r &= "("
-    gen(ctx, n[1], r)
-    ctx.space(r)
-    r &= ">>"
-    ctx.space(r)
-    gen(ctx, n[2], r)
-    r &= ")"
-  of "div":
-    gen(ctx, n[1], r)
-    ctx.space(r)
-    r &= "/"
-    ctx.space(r)
-    gen(ctx, n[2], r)
-  of "mod":
-    gen(ctx, n[1], r)
-    ctx.space(r)
-    r &= "%"
-    ctx.space(r)
-    gen(ctx, n[2], r)
-  of "not":
-    if getType(n).isIdent("bool"):
-      r &= "!("
-    else:
-      r &= "~("
-    gen(ctx, n[1], r)
-    r &= ")"
   of "max", "min", "abs", "clamp":
-    genSystemRegularFunctionCall(ctx, n, r)
+    r &= $(n[0])
+    r &= "("
+    for i in 1 ..< n.len:
+      if i != 1:
+        r &= ","
+        ctx.space(r)
+      gen(ctx, n[i], r)
+    r &= ")"
   else:
     echo "UNKNOWN SYSTEM CALL: ", treeRepr(n)
 
-proc genCall(ctx: var CompilerContext, n: NimNode, r: var string) =
-  if n[0].isMagic() and $n[0] in [".", "nimsl_deriveVectorWithComponents"]:
-    # This is a property
-    gen(ctx, n[1], r)
-    r &= "."
-    r &= $(n[2])
-  else:
-    if n[0].kind == nnkSym and n[0].isSystemSym:
-      genSystemCall(ctx, n, r)
-    elif isMagic(n[0]):
+proc precedance(n: NimNode): int =
+  result = 100
+  if n.kind in {nnkCall, nnkInfix, nnkPrefix}:
+    if n[0].kind == nnkSym:
       let name = $n[0]
+      let unary = n.len == 2
+      let bin = n.len == 3
+      result =
+        if unary and name in ["not", "-"]: 80
+        elif bin and name in ["*", "/", "mod", "div"]: 70
+        elif bin and name in ["+", "-"]: 60
+        elif bin and name in ["shl", "shr"]: 50
+        elif bin and name in ["<", "<=", ">", ">="]: 40
+        elif bin and name in ["==", "!="]: 35
+        elif bin and name in ["and"]: 30
+        elif bin and name in ["xor"]: 29
+        elif bin and name in ["or"]: 28
+        elif bin and name in ["+=", "-=", "*=", "/="]: 5
+        else: 100
+
+proc isUndistinctConv(n: NimNode): bool =
+  if n.kind != nnkConv:
+    return false
+  let srcType = getType(n[1]).getTypeImpl
+  srcType.kind == nnkDistinctTy and sameType(n[0], srcType[0])
+
+proc isTransparentConv(n: NimNode): bool =
+  n.kind == nnkHiddenStdConv or n.isUndistinctConv()
+
+proc skipConv(n: NimNode): NimNode =
+  result = n
+  while result.isTransparentConv():
+    result = result[^1]
+
+proc needsParens(parentPrec: int, parent, child: NimNode, sideLeft: bool): bool =
+  let child = skipConv(child)
+  let prec = precedance(child)
+  if prec < parentPrec: return true
+  if prec > parentPrec: return false
+  if child.len == 3 and child[0].kind == nnkSym and $child[0] in ["+", "-", "*", "/", "div", "mod", "shl", "shr", "<", ">", "<=", ">=", "==", "!=", "and", "or", "xor", "+=", "-=", "*=", "/="]:
+    discard
+  else:
+    return false
+  if $parent[0] in ["=", "+=", "-=", "*=", "/="]:
+    return sideLeft
+  return not sideLeft
+
+proc genBinaryOpCall(ctx: var CompilerContext, op: string, n: NimNode, r: var string) =
+  let prec = precedance(n)
+  let aNeedsParentheses = needsParens(prec, n, n[1], true)
+  if aNeedsParentheses: r &= "("
+  gen(ctx, skipAddr(n[1]), r)
+  if aNeedsParentheses: r &= ")"
+  ctx.space(r)
+  r &= op
+  ctx.space(r)
+  let bNeedsParentheses = needsParens(prec, n, n[2], false)
+  if bNeedsParentheses: r &= "("
+  gen(ctx, n[2], r)
+  if bNeedsParentheses: r &= ")"
+
+proc genUnaryOpCall(ctx: var CompilerContext, op: string, n: NimNode, r: var string) =
+  let prec = precedance(n)
+  let aNeedsParentheses = precedance(n[1]) < prec
+  r &= op
+  if aNeedsParentheses: r &= "("
+  gen(ctx, skipAddr(n[1]), r)
+  if aNeedsParentheses: r &= ")"
+
+proc genPostfixReceiver(ctx: var CompilerContext, a: NimNode, r: var string) =
+  let postfixPrec = 90
+  let aNeedsParentheses = precedance(skipConv(a)) < postfixPrec
+  if aNeedsParentheses: r &= "("
+  gen(ctx, a, r)
+  if aNeedsParentheses: r &= ")"
+
+proc genDotExpr(ctx: var CompilerContext, a: NimNode, b: string, r: var string) =
+  ctx.genPostfixReceiver(a, r)
+  r &= "."
+  r &= b
+
+proc genDotExpr(ctx: var CompilerContext, n: NimNode, r: var string) =
+  # let indexVal = n[1].skipConv.intVal
+  ctx.genDotExpr(n[0], $n[1], r)
+
+proc genCall(ctx: var CompilerContext, n: NimNode, r: var string) =
+  let symIsMagic = n[0].isMagic()
+  var name = ""
+  if n[0].kind == nnkSym:
+    name = $n[0]
+
+  if symIsMagic and name in [".", "nimsl_deriveVectorWithComponents"]:
+    # This is a property
+    ctx.genDotExpr(n[1], $n[2], r)
+  else:
+    let symIsSystem = isSystemSym(n[0])
+    if (symIsMagic or symIsSystem) and n.len == 3 and name in ["+=", "-=", "*=", "/=", "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "!="]:
+      ctx.genBinaryOpCall(name, n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 3 and name == "div":
+      ctx.genBinaryOpCall("/", n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 3 and name == "mod":
+      ctx.genBinaryOpCall("%", n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 3 and name == "shl":
+      ctx.genBinaryOpCall("<<", n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 3 and name == "shr":
+      ctx.genBinaryOpCall(">>", n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 3 and name == "and":
+      if getType(n).isIdent("bool"):
+        ctx.genBinaryOpCall("&&", n, r)
+      else:
+        ctx.genBinaryOpCall("&", n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 3 and name == "or":
+      if getType(n).isIdent("bool"):
+        ctx.genBinaryOpCall("||", n, r)
+      else:
+        ctx.genBinaryOpCall("|", n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 3 and name == "xor":
+      if getType(n).isIdent("bool"):
+        ctx.genBinaryOpCall("^^", n, r)
+      else:
+        ctx.genBinaryOpCall("^", n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 2 and name == "-":
+      ctx.genUnaryOpCall(name, n, r)
+    elif (symIsMagic or symIsSystem) and n.len == 2 and name == "not":
+      if getType(n).isIdent("bool"):
+        ctx.genUnaryOpCall("!", n, r)
+      else:
+        ctx.genUnaryOpCall("~", n, r)
+    elif symIsSystem:
+      genSystemCall(ctx, n, r)
+    elif symIsMagic:
       if name in ["x", "y", "z", "w", "r", "g", "b", "a"]:
-        gen(ctx, skipAddr(n[1]), r)
-        r &= "."
-        r &= name
-      # elif name == "fract":
-      #   r &= "modf("
-      #   gen(ctx, n[1], r)
-      #   r &= ").fract"
+        ctx.genDotExpr(skipAddr(n[1]), name, r)
       else:
         gen(ctx, n[0], r)
         r &= "("
@@ -512,25 +526,6 @@ proc genBracket(ctx: var CompilerContext, n: NimNode, r: var string) =
     gen(ctx, n[i], r)
   r &= ")"
 
-proc genInfixCall(ctx: var CompilerContext, n: NimNode, r: var string) =
-  # echo "INFIX: ", repr n
-  if isMagic(n[0]):
-    r &= "("
-    gen(ctx, n[1], r)
-    r &= $(n[0])
-    gen(ctx, n[2], r)
-    r &= ")"
-  else:
-    genCall(ctx, n, r)
-
-proc genPrefixCall(ctx: var CompilerContext, n: NimNode, r: var string) =
-  # echo "PREFIX: ", repr n
-  if isMagic(n[0]):
-    r &= $(n[0])
-    gen(ctx, n[1], r)
-  else:
-    genCall(ctx, n, r)
-
 proc genAsgn(ctx: var CompilerContext, n: NimNode, r: var string) =
   gen(ctx, n[0], r)
   ctx.space(r)
@@ -563,21 +558,21 @@ proc genReturnStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
       r &= " "
       gen(ctx, n[0][1], r)
 
-proc genWGSLBuiltinSym(n: NimNode): string =
+proc genWGSLMagicSym(n: NimNode): string =
   let pn = $n
   case pn
-  of "newVec2", "vec2": result = "vec2f"
-  of "newVec3", "vec3": result = "vec3f"
-  of "newVec4", "vec4": result = "vec4f"
+  of "vec2": result = "vec2f"
+  of "vec3": result = "vec3f"
+  of "vec4": result = "vec4f"
   else: result = pn
 
-proc genGLSLBuiltinSym(n: NimNode): string =
-  result = $n
+proc genGLSLMagicSym(n: NimNode): string =
+  $n
 
-proc genBuiltinSym(ctx: var CompilerContext, n: NimNode): string =
+proc genMagicSym(ctx: var CompilerContext, n: NimNode): string =
   case ctx.shaderLanguage
-  of slWGSL: genWGSLBuiltinSym(n)
-  of slGLSL: genGLSLBuiltinSym(n)
+  of slWGSL: genWGSLMagicSym(n)
+  of slGLSL: genGLSLMagicSym(n)
 
 proc globalVarAttrs(pragmas: NimNode, hasAssignment: bool): seq[string] =
   const addressSpaces = ["function", "private", "workgroup", "uniform", "storage", "handle"]
@@ -644,7 +639,7 @@ proc genSym(ctx: var CompilerContext, n: NimNode, r: var string) =
   case i.kind
   of nnkProcDef:
     if isMagic(i):
-      r &= genBuiltinSym(ctx, n)
+      r &= genMagicSym(ctx, n)
     else:
       # echo "PROCDEF ", n
       var s = ctx.globalSyms.getOrDefault(n)
@@ -772,7 +767,7 @@ proc genWGSLProcDef(ctx: var CompilerContext, n: NimNode, flags: set[ProcDefFlag
 
   let hasResult = n.params[0].kind != nnkEmpty
 
-  var r: string
+  var r = ""
   if forceCompute in flags: r &= "@compute "
   if forceVertex in flags: r &= "@vertex "
   if forceFragment in flags: r &= "@fragment "
@@ -998,22 +993,12 @@ proc genConv(ctx: var CompilerContext, n: NimNode, r: var string) =
   of slWGSL: genWGSLConv(ctx, n, r)
   of slGLSL: genGLSLConv(ctx, n, r)
 
-proc skipConv(n: NimNode): NimNode =
-  result = n
-  while result.kind == nnkHiddenStdConv:
-    result = result[^1]
-
 proc genBracketExpr(ctx: var CompilerContext, n: NimNode, r: var string) =
-  gen(ctx, n[0], r)
+  ctx.genPostfixReceiver(n[0], r)
   r &= "["
   gen(ctx, n[1], r)
   r &= "]"
 
-proc genDotExpr(ctx: var CompilerContext, n: NimNode, r: var string) =
-  # let indexVal = n[1].skipConv.intVal
-  gen(ctx, n[0], r)
-  r &= "."
-  gen(ctx, n[1], r)
 
 proc genIfStmt(ctx: var CompilerContext, n: NimNode, r: var string) =
   var first = true
@@ -1156,11 +1141,11 @@ proc gen(ctx: var CompilerContext, n: NimNode, r: var string) =
   of nnkLetSection, nnkVarSection: genLetSection(ctx, n, r)
   of nnkStmtList: genStmtList(ctx, n, r)
   of nnkStmtListExpr: genStmtListExpr(ctx, n, r)
-  of nnkCall: genCall(ctx, n, r)
+  of nnkCall, nnkInfix, nnkPrefix: genCall(ctx, n, r)
   of nnkObjConstr: genObjConstr(ctx, n, r)
   of nnkBracket: genBracket(ctx, n, r)
-  of nnkInfix: genInfixCall(ctx, n, r)
-  of nnkPrefix: genPrefixCall(ctx, n, r)
+  # of nnkInfix: genInfixCall(ctx, n, r)
+  # of nnkPrefix: genPrefixCall(ctx, n, r)
   of nnkFloatLit, nnkFloat64Lit, nnkFloat32Lit: r &= $n.floatVal
   of nnkIntLit, nnkInt32Lit: genIntLit(ctx, n, r)
   of nnkUInt32Lit: genUInt32Lit(ctx, n, r)

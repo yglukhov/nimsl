@@ -124,7 +124,7 @@ var<private> someArray0: array<bool,20>;
 fn vsMain() {
   let b = someArray0[1];
   someArray0[2] = b;
-  if !(someArray0[1]) {
+  if !someArray0[1] {
     someArray0[3] = someArray0[2];
   }
 }
@@ -164,6 +164,7 @@ fn vsMain() {
 
 import std/[math] # for mod
 block: # ops
+  proc someFunc(): float32 = 3
   proc vsMain() {.vertex.} =
     let a = 5'u32
     let b = not a
@@ -179,22 +180,34 @@ block: # ops
     var fv = 4'f32
     fv *= 2
     let swiz = v.xyz
+    let swiz2 = (v + v).xyz
+    let idxExpr = (v + v)[0]
+    let prec = v.x - (v.y - v.z)
+    let prec2 = v * (f * 0.07 + 1 - e)
+    v *= 4
+    v *= v
 
   chk(wgslShader(vsMain), """
 @vertex
 fn vsMain() {
   let a = 5u;
-  let b = ~(a);
+  let b = ~a;
   let c = false;
-  let d = !(c);
+  let d = !c;
   let e = 5.0;
   let f = e % 2.0;
   var v = vec4f(1.0);
-  v.y = (v.y * 2.0);
+  v.y = v.y * 2.0;
   let vs = vec3f(5.0, 5.0);
   var fv = 4.0;
   fv *= 2.0;
   let swiz = v.xyz;
+  let swiz2 = (v + v).xyz;
+  let idxExpr = (v + v)[0];
+  let prec = v.x - (v.y - v.z);
+  let prec2 = v * (f * 0.07 + 1 - e);
+  v *= 4.0;
+  v *= v;
 }
 """)
 
@@ -248,6 +261,9 @@ block: # implicit float conversion in if-expression
     let b = if true: a else: a + 1.0
     var c = 0.5'f32
     c = c + 2.0
+    c = (a + b) * c
+    c = a + (b * c)
+    c = a + b * c
 
   chk(wgslShader(vsMain), """
 @vertex
@@ -258,11 +274,14 @@ fn vsMain() {
     tmp0 = a;
   }
   else {
-    tmp0 = (a + 1.0);
+    tmp0 = a + 1.0;
   }
   let b = tmp0;
   var c = 0.5;
-  c = (c + 2.0);
+  c = c + 2.0;
+  c = (a + b) * c;
+  c = a + b * c;
+  c = a + b * c;
 }
 """)
 

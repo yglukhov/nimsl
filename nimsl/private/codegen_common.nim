@@ -58,14 +58,15 @@ proc isRange*(n: NimNode, rangeLen: int = -1): bool =
       result = true
 
 proc isSystemSym*(s: NimNode): bool =
-  let ln = s.getImpl().lineinfo
-  if ln.find("/system.nim(") != -1 or
-     ln.find("\\system.nim(") != -1 or
-     ln.find("\\system\\") != -1 or
-     ln.find("/system/") != -1 or
-      ln.find("/pure/math.nim(") != -1 or
-     ln.find("\\pure\\math.nim(") != -1:
-    result = true
+  if s.kind == nnkSym:
+    let ln = s.getImpl().lineinfo
+    if ln.find("/system.nim(") != -1 or
+        ln.find("\\system.nim(") != -1 or
+        ln.find("\\system\\") != -1 or
+        ln.find("/system/") != -1 or
+        ln.find("/pure/math.nim(") != -1 or
+        ln.find("\\pure\\math.nim(") != -1:
+        result = true
 
 proc genIdent*(a: int): string =
   const
