@@ -205,8 +205,8 @@ proc getTypeName(ctx: var CompilerContext, t: NimNode, skipVar = false): string 
     of "Vec2b", "bvec2": result = "vec2<bool>"
     of "Vec3b", "bvec3": result = "vec3<bool>"
     of "Vec4b", "bvec4": result = "vec4<bool>"
-    of "Mat3", "mat3": result = "mat3f"
-    of "Mat4", "mat4": result = "mat4f"
+    of "Mat3", "mat3": result = "mat3x3f"
+    of "Mat4", "mat4": result = "mat4x4f"
     of "Sampler": result = "sampler"
     else:
       result = ctx.globalSyms.getOrDefault(t)
