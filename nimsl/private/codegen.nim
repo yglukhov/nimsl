@@ -567,7 +567,12 @@ proc genWGSLMagicSym(n: NimNode): string =
   else: result = pn
 
 proc genGLSLMagicSym(n: NimNode): string =
-  $n
+  let pn = $n
+  case pn
+  of "newVec2": result = "vec2"
+  of "newVec3": result = "vec3"
+  of "newVec4": result = "vec4"
+  else: result = pn
 
 proc genMagicSym(ctx: var CompilerContext, n: NimNode): string =
   case ctx.shaderLanguage

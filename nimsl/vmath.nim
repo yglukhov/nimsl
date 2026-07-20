@@ -124,23 +124,23 @@ proc vec4*(xyz: Vec3, w: float32): Vec4 {.nimslmagic, inline.} = [xyz[0], xyz[1]
 proc vec4*(x: float32, yzw: Vec3): Vec4 {.nimslmagic, inline.} = [x, yzw[0], yzw[1], yzw[2]].Vec4
 
 
-proc newVec2*(x, y: float32): Vec2 = [x, y].Vec2
-proc newVec3*(x, y, z: float32): Vec3 = [x, y, z].Vec3
-proc newVec4*(x, y, z, w: float32): Vec4 = [x, y, z, w].Vec4
+proc newVec2*(x, y: float32): Vec2 {.nimslmagic, inline.} = [x, y].Vec2
+proc newVec3*(x, y, z: float32): Vec3 {.nimslmagic, inline.} = [x, y, z].Vec3
+proc newVec4*(x, y, z, w: float32): Vec4 {.nimslmagic, inline.} = [x, y, z, w].Vec4
 
-proc newVec2*(x: float32): Vec2 = [x, x].Vec2
-proc newVec3*(x: float32): Vec3 = [x, x, x].Vec3
-proc newVec4*(x: float32): Vec4 = [x, x, x, x].Vec4
+proc newVec2*(x: float32): Vec2 {.nimslmagic, inline.} = [x, x].Vec2
+proc newVec3*(x: float32): Vec3 {.nimslmagic, inline.} = [x, x, x].Vec3
+proc newVec4*(x: float32): Vec4 {.nimslmagic, inline.} = [x, x, x, x].Vec4
 
-proc newVec3*(x, y: float32): Vec3 = [x, y, y].Vec3
+proc newVec3*(x, y: float32): Vec3 {.nimslmagic, inline.} = [x, y, y].Vec3
 
-proc newVec3*(v: Vec2, z: float32): Vec3 = [v[0], v[1], z].Vec3
+proc newVec3*(v: Vec2, z: float32): Vec3 {.nimslmagic, inline.} = [v[0], v[1], z].Vec3
 
-proc newVec4*(x, y: float32): Vec4 = [x, y, y, y].Vec4
+proc newVec4*(x, y: float32): Vec4 {.nimslmagic, inline.} = [x, y, y, y].Vec4
 
-proc newVec4*(x, y, z: float32): Vec4 = [x, y, z, z].Vec4
-proc newVec4*(v: Vec2, z, w: float32): Vec4 = [v[0], v[1], z, w].Vec4
-proc newVec4*(u, v: Vec2): Vec4 = [u[0], u[1], v[0], v[1]].Vec4
+proc newVec4*(x, y, z: float32): Vec4 {.nimslmagic, inline.} = [x, y, z, z].Vec4
+proc newVec4*(v: Vec2, z, w: float32): Vec4 {.nimslmagic, inline.} = [v[0], v[1], z, w].Vec4
+proc newVec4*(u, v: Vec2): Vec4 {.nimslmagic, inline.} = [u[0], u[1], v[0], v[1]].Vec4
 
 template forEachComponentI(num: int, body: untyped) =
   when num > 0:
