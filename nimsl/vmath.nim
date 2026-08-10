@@ -269,6 +269,7 @@ proc smoothstep*(edge0, edge1, x: float32): float32 {.nimslmagic.} =
   result = c*c*(3 - 2*c)
 
 proc fwidth*(v: float32): float32 {.nimslmagic.} = 0
+proc mix*(x, y, a: float32): float32 {.nimslmagic.} = x * (1.0'f32 - a) + y * a
 proc mix*[I: static[int]](x, y: VecBase[I, float32], a: float32): VecBase[I, float32] {.nimslmagic.} = x * (1.0 - a) + y * a
 proc mix*[I: static[int]](x, y, a: VecBase[I, float32]): VecBase[I, float32] {.nimslmagic.} =
   for i in 0 ..< I:
@@ -302,11 +303,19 @@ proc x*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimsl
 proc y*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimslmagic.} = v[1]
 proc z*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimslmagic.} = v[2]
 proc w*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimslmagic.} = v[3]
+proc r*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimslmagic.} = v[0]
+proc g*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimslmagic.} = v[1]
+proc b*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimslmagic.} = v[2]
+proc a*[I: static[int], T](v: VecBase[I, T]): T {.inline, stackTrace: off, nimslmagic.} = v[3]
 
 proc x*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[0]
 proc y*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[1]
 proc z*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[2]
 proc w*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[3]
+proc r*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[0]
+proc g*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[1]
+proc b*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[2]
+proc a*[I: static[int], T](v: var VecBase[I, T]): var T {.inline, stackTrace: off, nimslmagic.} = v[3]
 
 proc `*`*(m: Mat4, v: Vec4): Vec4 {.nimslmagic.} =
   let (x, y, z, w) = (v[0], v[1], v[2], v[3])

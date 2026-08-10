@@ -11,7 +11,6 @@ proc lowerExpr(ctx: var Context, n: NimNode): Lowering
 proc lowerStmt(ctx: var Context, n: NimNode): NimNode
 
 proc addOutVar(ctx: var Context, stmtList, typ: NimNode): NimNode =
-  echo "OUTVAR: ", treeRepr(typ)
   result = genSym(nskVar, "tmp" & $ctx.tmpId)
   # result = ident("tmp" & $ctx.tmpId)
   inc ctx.tmpId
